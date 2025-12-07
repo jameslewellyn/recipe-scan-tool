@@ -15,6 +15,7 @@ dependencies = [
 
 [project.scripts]
 extract-notecards = "notecard_extractor.main:app"
+white-border-remover = "notecard_extractor.main:white_border_remover_app"
 
 [build-system]
 requires = ["hatchling"]
