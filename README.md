@@ -4,26 +4,29 @@ A Python tool to extract and crop notecard images from PDF files. This tool proc
 
 ## Installation
 
-This project uses Poetry for dependency management. To install:
+This project uses uv for dependency management. To install:
 
-1. Make sure you have Poetry installed
+1. Make sure you have [uv](https://github.com/astral-sh/uv) installed
 2. Clone this repository
 3. Run:
 ```bash
-poetry install
+uv sync
 ```
 
 ## Usage
 
 The tool can be used in two ways:
 
-1. Using Poetry:
+1. Using uv:
 ```bash
-poetry run extract-notecards /path/to/pdf/folder
+uv run extract-notecards /path/to/pdf/folder
 ```
 
-2. After activating the Poetry environment:
+2. After activating the uv environment:
 ```bash
+source .venv/bin/activate  # On macOS/Linux
+# or
+.venv\Scripts\activate  # On Windows
 extract-notecards /path/to/pdf/folder
 ```
 

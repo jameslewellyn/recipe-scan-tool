@@ -1,17 +1,20 @@
-[tool.poetry]
+[project]
 name = "notecard-extractor"
 version = "0.1.0"
 description = "A tool to extract and crop notecard images from PDF files"
-authors = ["Your Name <your.email@example.com>"]
+authors = [
+    {name = "Your Name", email = "your.email@example.com"}
+]
 readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "pdfly",
+    "typer",
+]
 
-[tool.poetry.dependencies]
-python = "^3.13
-typer = "*"
-
-[tool.poetry.scripts]
+[project.scripts]
 extract-notecards = "notecard_extractor.main:app"
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
