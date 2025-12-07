@@ -1,7 +1,8 @@
 from pathlib import Path
-import subprocess
 import typer
-import shutil
+from pypdf import PdfReader
+from PIL import Image
+import io
 
 app = typer.Typer()
 
@@ -11,10 +12,15 @@ def extract_notecards(
     input_folder: Path = typer.Argument(
         ..., help="Folder containing PDF files to process"
     ),
+    output_folder: Path = typer.Option(
+        None,
+        "--output-folder",
+        help="Optional output folder for extracted images. If not provided, images will be saved to '{input_folder}_images' next to the input folder.",
+    ),
 ):
     """
     Extract a single image from each PDF file in the input folder.
-    Images are saved to a folder named '{input_folder}_images' next to the input folder.
+    Images are saved to the specified output folder, or to '{input_folder}_images' if not provided.
     """
     # Validate input folder
     input_folder = Path(input_folder).resolve()
@@ -22,9 +28,13 @@ def extract_notecards(
         typer.echo(f"Error: '{input_folder}' is not a valid directory.", err=True)
         raise typer.Exit(code=1)
 
-    # Create output folder
-    output_folder = input_folder.parent / f"{input_folder.name}_images"
-    output_folder.mkdir(exist_ok=True)
+    # Determine output folder
+    if output_folder is None:
+        output_folder = input_folder.parent / f"{input_folder.name}_images"
+    else:
+        output_folder = Path(output_folder).resolve()
+
+    output_folder.mkdir(parents=True, exist_ok=True)
     typer.echo(f"Output folder: {output_folder}")
 
     # Find all PDF files
@@ -40,59 +50,58 @@ def extract_notecards(
         try:
             typer.echo(f"Processing: {pdf_file.name}")
 
-            # Use pdfly to extract images - it extracts to a temp location
-            # We'll extract to a temp folder first, then move the first image
-            temp_output = pdf_file.parent / f"{pdf_file.stem}_temp_images"
-            temp_output.mkdir(exist_ok=True)
+            # Read PDF and extract images
+            reader = PdfReader(pdf_file)
+            images_found = False
 
-            try:
-                # Run pdfly extract-images command
-                subprocess.run(
-                    [
-                        "pdfly",
-                        "extract-images",
-                        str(pdf_file),
-                        "--output",
-                        str(temp_output),
-                    ],
-                    capture_output=True,
-                    text=True,
-                    check=True,
-                )
+            # Iterate through pages to find the first image
+            for page_num, page in enumerate(reader.pages):
+                if images_found:
+                    break
 
-                # Find the first extracted image (look for common image extensions)
-                # pdfly might extract to subdirectories, so use rglob
-                image_extensions = [
-                    "*.png",
-                    "*.jpg",
-                    "*.jpeg",
-                    "*.gif",
-                    "*.bmp",
-                    "*.tiff",
-                ]
-                extracted_images = []
-                for ext in image_extensions:
-                    extracted_images.extend(temp_output.rglob(ext))
+                # Extract images from the page
+                for image_index, image_file_object in enumerate(page.images):
+                    try:
+                        # Get image data
+                        image_data = image_file_object.data
 
-                if extracted_images:
-                    # Sort to get consistent ordering and take the first one
-                    first_image = sorted(extracted_images)[0]
-                    # Preserve the original extension
-                    output_path = output_folder / f"{pdf_file.stem}{first_image.suffix}"
+                        # Determine file extension from image name or default to png
+                        image_name = image_file_object.name
+                        if image_name:
+                            # Try to infer extension from name
+                            ext = Path(image_name).suffix.lower()
+                            if ext not in [
+                                ".png",
+                                ".jpg",
+                                ".jpeg",
+                                ".gif",
+                                ".bmp",
+                                ".tiff",
+                            ]:
+                                ext = ".png"  # Default to PNG
+                        else:
+                            ext = ".png"  # Default to PNG
 
-                    # Copy the image to the final output folder
-                    shutil.copy2(first_image, output_path)
-                    typer.echo(f"  ✓ Extracted image: {output_path.name}")
-                else:
-                    typer.echo(f"  ⚠ No images found in '{pdf_file.name}'", err=True)
+                        # Open image with PIL
+                        image = Image.open(io.BytesIO(image_data))
 
-            finally:
-                # Clean up temp folder
-                if temp_output.exists():
-                    shutil.rmtree(temp_output)
+                        # Save the first image found
+                        output_path = output_folder / f"{pdf_file.stem}{ext}"
+                        image.save(output_path)
+                        typer.echo(f"  ✓ Extracted image: {output_path.name}")
+                        images_found = True
+                        break
 
-        except subprocess.CalledProcessError as e:
-            typer.echo(f"  ✗ Error processing '{pdf_file.name}': {e.stderr}", err=True)
+                    except Exception as e:
+                        typer.echo(
+                            f"  ⚠ Error extracting image {image_index} from page {page_num + 1}: {e}",
+                            err=True,
+                        )
+                        continue
+
+            if not images_found:
+                typer.echo(f"  ⚠ No images found in '{pdf_file.name}'", err=True)
+
         except Exception as e:
             typer.echo(f"  ✗ Error processing '{pdf_file.name}': {e}", err=True)
 
