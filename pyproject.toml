@@ -11,11 +11,14 @@ dependencies = [
     "pypdf",
     "pillow",
     "typer",
+    "flask",
 ]
 
 [project.scripts]
 extract-notecards = "notecard_extractor.main:app"
 white-border-remover = "notecard_extractor.main:white_border_remover_app"
+grey-border-remover = "notecard_extractor.main:grey_border_remover_app"
+web-gui = "notecard_extractor.web_gui:run_server"
 
 [build-system]
 requires = ["hatchling"]

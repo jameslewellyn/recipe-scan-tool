@@ -160,6 +160,153 @@ def autocrop_white_border(image: Image.Image, threshold: int = 250) -> Image.Ima
     return image.crop((left, top, right, bottom))
 
 
+def autocrop_grey_border(
+    image: Image.Image,
+    border_color: tuple = None,
+    tolerance: int = 60,
+) -> Image.Image:
+    """
+    Remove greyish left and right margins from an image.
+    Samples the first 20 pixels on each side to determine margin color,
+    then scans inward until finding columns with non-margin content.
+    Only removes left and right margins, keeping full height.
+
+    Args:
+        image: PIL Image to crop
+        border_color: RGB color of the margins to remove. If None, auto-detects from edges.
+        tolerance: Color distance tolerance for matching margin pixels (0-255)
+
+    Returns:
+        Cropped PIL Image with left and right margins removed
+    """
+    # Convert to RGB if needed
+    if image.mode != "RGB":
+        img_rgb = image.convert("RGB")
+    else:
+        img_rgb = image
+
+    # Get image data
+    pixels = img_rgb.load()
+    width, height = img_rgb.size
+
+    # Calculate color distance function
+    def color_distance(rgb1, rgb2):
+        """Calculate Euclidean distance between two RGB colors."""
+        return sum((a - b) ** 2 for a, b in zip(rgb1, rgb2)) ** 0.5
+
+    # Exclude top and bottom edges (often have different colors like headers/footers)
+    edge_exclusion = max(10, height // 20)  # Exclude ~5% from top and bottom
+    scan_y_start = edge_exclusion
+    scan_y_end = height - edge_exclusion
+
+    # Sample first 20 pixels from left edge to determine left margin color
+    import statistics
+
+    left_margin_pixels = []
+    sample_width = min(20, width)
+    for x in range(sample_width):
+        for y in range(
+            scan_y_start, scan_y_end, max(1, (scan_y_end - scan_y_start) // 20)
+        ):
+            left_margin_pixels.append(pixels[x, y])
+
+    if left_margin_pixels:
+        r_vals = [p[0] for p in left_margin_pixels]
+        g_vals = [p[1] for p in left_margin_pixels]
+        b_vals = [p[2] for p in left_margin_pixels]
+        left_margin_color = (
+            int(statistics.mean(r_vals)),
+            int(statistics.mean(g_vals)),
+            int(statistics.mean(b_vals)),
+        )
+    else:
+        # Fallback to provided border_color or default
+        left_margin_color = border_color if border_color else (240, 240, 240)
+
+    # Sample first 20 pixels from right edge to determine right margin color
+    right_margin_pixels = []
+    for x in range(max(0, width - sample_width), width):
+        for y in range(
+            scan_y_start, scan_y_end, max(1, (scan_y_end - scan_y_start) // 20)
+        ):
+            right_margin_pixels.append(pixels[x, y])
+
+    if right_margin_pixels:
+        r_vals = [p[0] for p in right_margin_pixels]
+        g_vals = [p[1] for p in right_margin_pixels]
+        b_vals = [p[2] for p in right_margin_pixels]
+        right_margin_color = (
+            int(statistics.mean(r_vals)),
+            int(statistics.mean(g_vals)),
+            int(statistics.mean(b_vals)),
+        )
+    else:
+        # Fallback to left margin color or provided border_color
+        right_margin_color = (
+            left_margin_color
+            if left_margin_pixels
+            else (border_color if border_color else (240, 240, 240))
+        )
+
+    # Scan from left edge inward until we find a column with non-margin content
+    left = 0
+    scan_limit = min(int(width * 0.5), 1000)  # Scan up to 50% of width or 1000px
+    for x in range(scan_limit):
+        # Check if this column has only margin color (within tolerance)
+        all_margin = True
+        sample_size = min(30, scan_y_end - scan_y_start)
+        step = max(1, (scan_y_end - scan_y_start) // sample_size)
+
+        for y in range(scan_y_start, scan_y_end, step):
+            pixel_rgb = pixels[x, y]
+            distance = color_distance(pixel_rgb, left_margin_color)
+            if distance > tolerance:
+                # Found a non-margin pixel - this column has content
+                all_margin = False
+                break
+
+        if not all_margin:
+            # Found content, stop here
+            left = x
+            break
+
+    # Scan from right edge inward until we find a column with non-margin content
+    right = width
+    scan_start = max(
+        left + int(width * 0.1), int(width * 0.5)
+    )  # Start from middle or left boundary
+    for x in range(width - 1, scan_start - 1, -1):
+        # Check if this column has only margin color (within tolerance)
+        all_margin = True
+        sample_size = min(30, scan_y_end - scan_y_start)
+        step = max(1, (scan_y_end - scan_y_start) // sample_size)
+
+        for y in range(scan_y_start, scan_y_end, step):
+            pixel_rgb = pixels[x, y]
+            distance = color_distance(pixel_rgb, right_margin_color)
+            if distance > tolerance:
+                # Found a non-margin pixel - this column has content
+                all_margin = False
+                break
+
+        if not all_margin:
+            # Found content, stop here (content extends to x+1)
+            right = x + 1
+            break
+
+    # If no margins found or content is too narrow, return original
+    if left >= right or right - left < width * 0.1:
+        return image
+
+    # Add small padding to avoid cutting too close
+    padding = 2
+    left = max(0, left - padding)
+    right = min(width, right + padding)
+
+    # Crop only left and right margins, keep full height
+    return image.crop((left, 0, right, height))
+
+
 @app.command()
 def white_border_remover(
     input_folder: Path = typer.Argument(
@@ -258,9 +405,147 @@ def white_border_remover(
     typer.echo(f"\nDone! Cropped images saved to: {output_folder}")
 
 
+@app.command()
+def grey_border_remover(
+    input_folder: Path = typer.Argument(
+        ..., help="Folder containing image files to process"
+    ),
+    border_r: int = typer.Option(
+        None,
+        "--border-r",
+        help="Red component of border color (0-255). If not specified, auto-detects from image edges.",
+    ),
+    border_g: int = typer.Option(
+        None,
+        "--border-g",
+        help="Green component of border color (0-255). If not specified, auto-detects from image edges.",
+    ),
+    border_b: int = typer.Option(
+        None,
+        "--border-b",
+        help="Blue component of border color (0-255). If not specified, auto-detects from image edges.",
+    ),
+    tolerance: int = typer.Option(
+        60,
+        "--tolerance",
+        help="Color distance tolerance for matching border pixels (0-255). Higher values remove more border.",
+    ),
+):
+    """
+    Remove greyish left and right margins from images in the input folder.
+    Only removes side margins, keeping full height. Cropped images are saved to '{input_folder}_grey-removed' next to the input folder.
+    """
+    # Validate input folder
+    input_folder = Path(input_folder).resolve()
+    if not input_folder.is_dir():
+        typer.echo(f"Error: '{input_folder}' is not a valid directory.", err=True)
+        raise typer.Exit(code=1)
+
+    # Validate color components if provided
+    if border_r is not None or border_g is not None or border_b is not None:
+        if not all(c is not None for c in [border_r, border_g, border_b]):
+            typer.echo(
+                "Error: All border color components (--border-r, --border-g, --border-b) must be provided together, or none at all for auto-detection.",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+        if not all(0 <= c <= 255 for c in [border_r, border_g, border_b]):
+            typer.echo(
+                "Error: Border color components must be between 0 and 255.", err=True
+            )
+            raise typer.Exit(code=1)
+        border_color = (border_r, border_g, border_b)
+    else:
+        border_color = None  # Will be auto-detected
+
+    # Validate tolerance
+    if not 0 <= tolerance <= 255:
+        typer.echo("Error: Tolerance must be between 0 and 255.", err=True)
+        raise typer.Exit(code=1)
+
+    # Create output folder
+    output_folder = input_folder.parent / f"{input_folder.name}_grey-removed"
+    output_folder.mkdir(parents=True, exist_ok=True)
+    typer.echo(f"Output folder: {output_folder}")
+    if border_color:
+        typer.echo(f"Border color: RGB{border_color}")
+    else:
+        typer.echo("Border color: Auto-detecting from image edges")
+    typer.echo(f"Tolerance: {tolerance}")
+
+    # Find all image files
+    image_extensions = [
+        "*.jpg",
+        "*.jpeg",
+        "*.png",
+        "*.gif",
+        "*.bmp",
+        "*.tiff",
+        "*.webp",
+    ]
+    image_files = []
+    for ext in image_extensions:
+        image_files.extend(input_folder.glob(ext))
+        image_files.extend(input_folder.glob(ext.upper()))
+
+    image_files = sorted(set(image_files))  # Remove duplicates and sort
+
+    if not image_files:
+        typer.echo(f"No image files found in '{input_folder}'.", err=True)
+        raise typer.Exit(code=1)
+
+    typer.echo(f"Found {len(image_files)} image file(s) to process...")
+
+    # Process each image
+    for image_file in image_files:
+        try:
+            typer.echo(f"Processing: {image_file.name}")
+
+            # Open and process image
+            with Image.open(image_file) as img:
+                # Convert to RGB if needed (for saving as JPEG)
+                if img.mode in ("RGBA", "LA", "P"):
+                    # Create white background for transparent images
+                    rgb_img = Image.new("RGB", img.size, (255, 255, 255))
+                    if img.mode == "P":
+                        img = img.convert("RGBA")
+                    rgb_img.paste(
+                        img, mask=img.split()[-1] if img.mode == "RGBA" else None
+                    )
+                    img = rgb_img
+                elif img.mode != "RGB":
+                    img = img.convert("RGB")
+
+                # Crop grey borders
+                cropped_img = autocrop_grey_border(img, border_color, tolerance)
+
+                # Save the cropped image
+                output_path = output_folder / image_file.name
+                # Preserve format, but convert RGBA to RGB for JPEG
+                if output_path.suffix.lower() in [".jpg", ".jpeg"]:
+                    if cropped_img.mode == "RGBA":
+                        rgb_img = Image.new("RGB", cropped_img.size, (255, 255, 255))
+                        rgb_img.paste(cropped_img, mask=cropped_img.split()[-1])
+                        cropped_img = rgb_img
+                    cropped_img.save(output_path, "JPEG", quality=95)
+                else:
+                    cropped_img.save(output_path)
+
+                typer.echo(f"  ✓ Cropped image: {output_path.name}")
+
+        except Exception as e:
+            typer.echo(f"  ✗ Error processing '{image_file.name}': {e}", err=True)
+
+    typer.echo(f"\nDone! Cropped images saved to: {output_folder}")
+
+
 # Separate app for white-border-remover command
 white_border_remover_app = typer.Typer()
 white_border_remover_app.command()(white_border_remover)
+
+# Separate app for grey-border-remover command
+grey_border_remover_app = typer.Typer()
+grey_border_remover_app.command()(grey_border_remover)
 
 
 if __name__ == "__main__":
