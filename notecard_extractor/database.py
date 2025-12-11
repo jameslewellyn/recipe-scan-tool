@@ -6,8 +6,9 @@ Uses SQLModel to define the database schema.
 
 from enum import Enum
 from sqlmodel import SQLModel, Field, Column
-from sqlalchemy import LargeBinary
+from sqlalchemy import LargeBinary, DateTime
 from typing import Optional
+from datetime import datetime
 
 
 class RecipeState(str, Enum):
@@ -43,6 +44,10 @@ class Recipe(SQLModel, table=True):
         default=None, sa_column=Column(LargeBinary)
     )
     original_pdf_sha256: Optional[str] = Field(default=None, index=True, max_length=64)
+    pdf_filename: Optional[str] = Field(default=None, max_length=500)
+    pdf_upload_timestamp: Optional[datetime] = Field(
+        default=None, sa_column=Column(DateTime)
+    )
 
     # Cropped image data
     cropped_image_data: Optional[bytes] = Field(
