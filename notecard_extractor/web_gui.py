@@ -126,6 +126,48 @@ def upload_pdfs():
         return jsonify({"error": str(e)}), 500
 
 
+@flask_app.route("/api/recipes", methods=["GET"])
+def get_recipes():
+    """
+    Get a list of all recipes from the database.
+    Returns recipes ordered by upload timestamp (newest first).
+    """
+    if db_engine is None:
+        return jsonify({"error": "Database not initialized"}), 500
+
+    try:
+        with Session(db_engine) as session:
+            recipes = (
+                session.query(Recipe).order_by(Recipe.pdf_upload_timestamp.desc()).all()
+            )
+
+            results = []
+            for idx, recipe in enumerate(recipes, start=1):
+                pdf_size = (
+                    len(recipe.original_pdf_data) if recipe.original_pdf_data else 0
+                )
+                upload_time = (
+                    recipe.pdf_upload_timestamp.isoformat()
+                    if recipe.pdf_upload_timestamp
+                    else None
+                )
+
+                results.append(
+                    {
+                        "id": recipe.id,
+                        "count": idx,
+                        "upload_timestamp": upload_time,
+                        "pdf_filename": recipe.pdf_filename or "Unknown",
+                        "pdf_size": pdf_size,
+                    }
+                )
+
+            return jsonify({"recipes": results, "total": len(results)})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 # Get path to user's home directory
 HOME_DIR = Path.home()
 

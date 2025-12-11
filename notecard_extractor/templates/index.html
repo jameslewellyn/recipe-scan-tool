@@ -252,6 +252,55 @@
         .tab-content.active {
             display: block;
         }
+
+        .recipes-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .recipes-table th,
+        .recipes-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .recipes-table th {
+            background: #f5f5f5;
+            font-weight: 600;
+            color: #333;
+            position: sticky;
+            top: 0;
+        }
+
+        .recipes-table tr:hover {
+            background: #f8f8f8;
+        }
+
+        .recipes-table td {
+            color: #666;
+        }
+
+        .count-column {
+            width: 60px;
+            text-align: center;
+        }
+
+        .timestamp-column {
+            width: 180px;
+            font-size: 0.9em;
+        }
+
+        .filename-column {
+            flex: 1;
+        }
+
+        .size-column {
+            width: 100px;
+            text-align: right;
+            font-family: monospace;
+        }
     </style>
 </head>
 <body>
@@ -263,7 +312,7 @@
 
         <div class="tabs">
             <div class="tab" data-tab="upload">📤 Upload</div>
-            <div class="tab active" data-tab="view">👁️ View</div>
+            <div class="tab active" data-tab="view">🔍 View</div>
             <div class="tab" data-tab="edit">✏️ Edit</div>
         </div>
 
@@ -321,9 +370,36 @@
 
         <!-- View Tab -->
         <div id="view-tab" class="tab-content active">
-            <div class="empty-state">
-                <div class="empty-state-icon">👁️</div>
-                <p>View functionality coming soon...</p>
+            <div class="files-header">
+                <h2>Uploaded PDFs</h2>
+                <div id="recipeCount" class="file-count" style="display: none;">0 PDFs</div>
+            </div>
+
+            <div id="viewLoading" class="loading" style="display: none;">
+                Loading recipes...
+            </div>
+
+            <div id="viewError" class="error" style="display: none;"></div>
+
+            <div id="recipesTableContainer" style="display: none;">
+                <table class="recipes-table">
+                    <thead>
+                        <tr>
+                            <th class="count-column">#</th>
+                            <th class="timestamp-column">Upload Date/Time</th>
+                            <th class="filename-column">PDF Name</th>
+                            <th class="size-column">Size</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recipesTableBody">
+                        <!-- Recipes will be inserted here -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="viewEmptyState" class="empty-state">
+                <div class="empty-state-icon">📄</div>
+                <p>No PDFs uploaded yet. Use the Upload tab to add PDFs to the database.</p>
             </div>
         </div>
     </div>
@@ -344,8 +420,18 @@
                 // Add active class to clicked tab and corresponding content
                 this.classList.add('active');
                 document.getElementById(`${targetTab}-tab`).classList.add('active');
+                
+                // Load recipes when View tab is clicked
+                if (targetTab === 'view') {
+                    loadRecipes();
+                }
             });
         });
+
+        // Load recipes on page load if View tab is active
+        if (document.getElementById('view-tab').classList.contains('active')) {
+            loadRecipes();
+        }
 
         // Upload tab functionality
         const pdfInput = document.getElementById('pdfInput');
@@ -538,6 +624,80 @@
             errorMessage.textContent = message;
             errorMessage.style.display = 'block';
             loading.style.display = 'none';
+        }
+
+        // View tab functionality
+        const viewLoading = document.getElementById('viewLoading');
+        const viewError = document.getElementById('viewError');
+        const recipesTableContainer = document.getElementById('recipesTableContainer');
+        const recipesTableBody = document.getElementById('recipesTableBody');
+        const recipeCount = document.getElementById('recipeCount');
+        const viewEmptyState = document.getElementById('viewEmptyState');
+
+        async function loadRecipes() {
+            viewLoading.style.display = 'block';
+            viewError.style.display = 'none';
+            recipesTableContainer.style.display = 'none';
+            viewEmptyState.style.display = 'none';
+
+            try {
+                const response = await fetch('/api/recipes');
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to load recipes');
+                }
+
+                displayRecipes(data.recipes);
+            } catch (error) {
+                viewError.textContent = 'Error loading recipes: ' + error.message;
+                viewError.style.display = 'block';
+            } finally {
+                viewLoading.style.display = 'none';
+            }
+        }
+
+        function displayRecipes(recipes) {
+            if (recipes.length === 0) {
+                viewEmptyState.style.display = 'block';
+                recipesTableContainer.style.display = 'none';
+                recipeCount.style.display = 'none';
+                return;
+            }
+
+            recipeCount.textContent = `${recipes.length} PDF${recipes.length !== 1 ? 's' : ''}`;
+            recipeCount.style.display = 'block';
+
+            recipesTableBody.innerHTML = '';
+            recipes.forEach(recipe => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="count-column">${recipe.count}</td>
+                    <td class="timestamp-column">${formatTimestamp(recipe.upload_timestamp)}</td>
+                    <td class="filename-column">${escapeHtml(recipe.pdf_filename)}</td>
+                    <td class="size-column">${formatFileSize(recipe.pdf_size)}</td>
+                `;
+                recipesTableBody.appendChild(row);
+            });
+
+            recipesTableContainer.style.display = 'block';
+            viewEmptyState.style.display = 'none';
+        }
+
+        function formatTimestamp(timestamp) {
+            if (!timestamp) return 'Unknown';
+            try {
+                const date = new Date(timestamp);
+                return date.toLocaleString();
+            } catch (e) {
+                return timestamp;
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
     </script>
 </body>
