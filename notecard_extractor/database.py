@@ -55,6 +55,14 @@ class Recipe(SQLModel, table=True):
     )
     cropped_image_sha256: Optional[str] = Field(default=None, index=True, max_length=64)
 
+    # Medium and thumbnail versions
+    medium_image_data: Optional[bytes] = Field(
+        default=None, sa_column=Column(LargeBinary)
+    )
+    medium_image_sha256: Optional[str] = Field(default=None, index=True, max_length=64)
+    thumbnail_data: Optional[bytes] = Field(default=None, sa_column=Column(LargeBinary))
+    thumbnail_sha256: Optional[str] = Field(default=None, index=True, max_length=64)
+
     # Rotation (0, 90, 180, or 270 degrees)
     rotation: int = Field(default=0, ge=0, le=270)
 

@@ -30,13 +30,16 @@ app = typer.Typer()
 db_engine = None
 
 
-def extract_and_process_image_from_pdf(pdf_data: bytes) -> tuple[bytes, str] | None:
+def extract_and_process_image_from_pdf(
+    pdf_data: bytes,
+) -> tuple[bytes, str, bytes, str, bytes, str] | None:
     """
     Extract the first image from a PDF, process it (remove white and grey borders),
-    and return the processed image data and its SHA256 hash.
+    and create thumbnail and medium versions.
 
     Returns:
-        Tuple of (image_bytes, sha256_hash) or None if no image found
+        Tuple of (full_image_bytes, full_image_hash, medium_image_bytes, medium_image_hash,
+                  thumbnail_bytes, thumbnail_hash) or None if no image found
     """
     try:
         # Read PDF from bytes
@@ -81,7 +84,32 @@ def extract_and_process_image_from_pdf(pdf_data: bytes) -> tuple[bytes, str] | N
                     # Calculate SHA256 hash of processed image
                     image_hash = hashlib.sha256(image_bytes).hexdigest()
 
-                    return (image_bytes, image_hash)
+                    # Create medium version (max 800px on longest side)
+                    medium_size = (800, 800)
+                    medium_image = image.copy()
+                    medium_image.thumbnail(medium_size, Image.Resampling.LANCZOS)
+                    medium_bytes = io.BytesIO()
+                    medium_image.save(medium_bytes, format="PNG")
+                    medium_bytes = medium_bytes.getvalue()
+                    medium_hash = hashlib.sha256(medium_bytes).hexdigest()
+
+                    # Create thumbnail version (max 200px on longest side)
+                    thumbnail_size = (200, 200)
+                    thumbnail_image = image.copy()
+                    thumbnail_image.thumbnail(thumbnail_size, Image.Resampling.LANCZOS)
+                    thumbnail_bytes = io.BytesIO()
+                    thumbnail_image.save(thumbnail_bytes, format="PNG")
+                    thumbnail_bytes = thumbnail_bytes.getvalue()
+                    thumbnail_hash = hashlib.sha256(thumbnail_bytes).hexdigest()
+
+                    return (
+                        image_bytes,
+                        image_hash,
+                        medium_bytes,
+                        medium_hash,
+                        thumbnail_bytes,
+                        thumbnail_hash,
+                    )
 
                 except Exception as e:
                     # Continue to next image if this one fails
@@ -174,7 +202,14 @@ def upload_pdfs():
                         )
                         continue
 
-                    cropped_image_data, cropped_image_hash = image_result
+                    (
+                        cropped_image_data,
+                        cropped_image_hash,
+                        medium_image_data,
+                        medium_image_hash,
+                        thumbnail_data,
+                        thumbnail_hash,
+                    ) = image_result
 
                     # Create new recipe entry
                     recipe = Recipe(
@@ -184,6 +219,10 @@ def upload_pdfs():
                         pdf_upload_timestamp=datetime.utcnow(),
                         cropped_image_data=cropped_image_data,
                         cropped_image_sha256=cropped_image_hash,
+                        medium_image_data=medium_image_data,
+                        medium_image_sha256=medium_image_hash,
+                        thumbnail_data=thumbnail_data,
+                        thumbnail_sha256=thumbnail_hash,
                     )
 
                     session.add(recipe)
@@ -282,6 +321,70 @@ def get_recipe_image(recipe_id: int):
                 mimetype="image/png",
                 headers={
                     "Content-Disposition": f"inline; filename=recipe_{recipe_id}.png"
+                },
+            )
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@flask_app.route("/api/recipe/<int:recipe_id>/thumbnail", methods=["GET"])
+def get_recipe_thumbnail(recipe_id: int):
+    """
+    Get the thumbnail image for a specific recipe.
+    Returns the thumbnail data as PNG.
+    """
+    if db_engine is None:
+        return jsonify({"error": "Database not initialized"}), 500
+
+    try:
+        with Session(db_engine) as session:
+            recipe = session.get(Recipe, recipe_id)
+
+            if not recipe:
+                return jsonify({"error": "Recipe not found"}), 404
+
+            if not recipe.thumbnail_data:
+                return jsonify({"error": "No thumbnail available"}), 404
+
+            # Return thumbnail as PNG
+            return Response(
+                recipe.thumbnail_data,
+                mimetype="image/png",
+                headers={
+                    "Content-Disposition": f"inline; filename=recipe_{recipe_id}_thumb.png"
+                },
+            )
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@flask_app.route("/api/recipe/<int:recipe_id>/medium", methods=["GET"])
+def get_recipe_medium(recipe_id: int):
+    """
+    Get the medium-sized image for a specific recipe.
+    Returns the medium image data as PNG.
+    """
+    if db_engine is None:
+        return jsonify({"error": "Database not initialized"}), 500
+
+    try:
+        with Session(db_engine) as session:
+            recipe = session.get(Recipe, recipe_id)
+
+            if not recipe:
+                return jsonify({"error": "Recipe not found"}), 404
+
+            if not recipe.medium_image_data:
+                return jsonify({"error": "No medium image available"}), 404
+
+            # Return medium image as PNG
+            return Response(
+                recipe.medium_image_data,
+                mimetype="image/png",
+                headers={
+                    "Content-Disposition": f"inline; filename=recipe_{recipe_id}_medium.png"
                 },
             )
 
