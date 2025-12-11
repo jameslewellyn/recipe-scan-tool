@@ -6,21 +6,23 @@ Provides a browser-based interface for selecting folders and viewing files.
 
 from flask import Flask, render_template, jsonify, request
 from pathlib import Path
-import os
+from typing import Annotated, Optional
+import typer
 
 # Get the directory where this module is located
 BASE_DIR = Path(__file__).parent
 
-app = Flask(__name__, template_folder=str(BASE_DIR / "templates"))
+flask_app = Flask(__name__, template_folder=str(BASE_DIR / "templates"))
+app = typer.Typer()
 
 
-@app.route("/")
+@flask_app.route("/")
 def index():
     """Serve the main HTML page."""
     return render_template("index.html")
 
 
-@app.route("/api/files", methods=["POST"])
+@flask_app.route("/api/files", methods=["POST"])
 def get_files():
     """
     Receive folder path from client and return list of files.
@@ -62,27 +64,27 @@ def get_files():
         return jsonify({"error": str(e)}), 500
 
 
-def run_server(host="127.0.0.1", port=5000, debug=False):
+@app.command()
+def run_server(
+    host: Annotated[
+        str, typer.Option("--host", "-h", help="Host to bind the server to")
+    ] = "127.0.0.1",
+    port: Annotated[
+        int, typer.Option("--port", "-p", help="Port to bind the server to")
+    ] = 5000,
+    debug: Annotated[
+        bool, typer.Option("--debug", "-d", help="Enable debug mode")
+    ] = False,
+    database: Annotated[
+        Optional[Path],
+        typer.Option("--database", "-db", help="Path to SQLite database file"),
+    ] = None,
+):
     """Run the Flask development server."""
-    print(f"Starting web server at http://{host}:{port}")
-    print("Press Ctrl+C to stop the server")
-    app.run(host=host, port=port, debug=debug)
+    typer.echo(f"Starting web server at http://{host}:{port}")
+    typer.echo("Press Ctrl+C to stop the server")
+    flask_app.run(host=host, port=port, debug=debug)
 
 
 if __name__ == "__main__":
-    import sys
-
-    # Parse command line arguments
-    host = "127.0.0.1"
-    port = 5000
-    debug = False
-
-    if len(sys.argv) > 1:
-        host = sys.argv[1]
-    if len(sys.argv) > 2:
-        port = int(sys.argv[2])
-    if len(sys.argv) > 3 and sys.argv[3].lower() == "debug":
-        debug = True
-
-    run_server(host=host, port=port, debug=debug)
-
+    app()

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Script to run web-gui with automatic venv setup and dependency installation.
-This script ensures the virtual environment exists and dependencies are installed before running.
+Script to update the virtual environment and dependencies.
+Uses uv to sync dependencies from pyproject.toml.
 """
 
 import subprocess
@@ -18,8 +18,8 @@ def check_uv_installed():
         return False
 
 
-def setup_and_run():
-    """Set up venv, install dependencies, and run web-gui."""
+def update_venv():
+    """Update the virtual environment and install/update dependencies."""
     # Get the directory where this script is located
     script_dir = Path(__file__).parent.resolve()
 
@@ -37,24 +37,15 @@ def setup_and_run():
 
     os.chdir(script_dir)
 
-    # Sync dependencies (creates venv if needed and installs dependencies)
-    print("Setting up virtual environment and installing dependencies...")
+    # Sync dependencies (creates venv if needed and updates dependencies)
+    print("Updating virtual environment and dependencies...")
     try:
         subprocess.run(["uv", "sync"], check=True)
+        print("Virtual environment updated successfully!")
     except subprocess.CalledProcessError as e:
-        print(f"Error setting up environment: {e}")
+        print(f"Error updating environment: {e}")
         sys.exit(1)
-
-    # Run the web-gui command with all passed arguments
-    try:
-        # Pass all command-line arguments to web-gui
-        subprocess.run(["uv", "run", "web-gui"] + sys.argv[1:], check=True)
-    except subprocess.CalledProcessError as e:
-        sys.exit(e.returncode)
-    except KeyboardInterrupt:
-        print("\nServer stopped.")
-        sys.exit(0)
 
 
 if __name__ == "__main__":
-    setup_and_run()
+    update_venv()
