@@ -9,9 +9,16 @@ from pathlib import Path
 from typing import Annotated, Optional
 import typer
 import hashlib
+import io
 from datetime import datetime
+from pypdf import PdfReader
+from PIL import Image
 from sqlmodel import SQLModel, create_engine, Session
 from notecard_extractor.database import Recipe, RecipeState
+from notecard_extractor.image_processing import (
+    autocrop_white_border,
+    autocrop_grey_border,
+)
 
 # Get the directory where this module is located
 BASE_DIR = Path(__file__).parent
@@ -21,6 +28,71 @@ app = typer.Typer()
 
 # Global database engine (will be initialized in run_server)
 db_engine = None
+
+
+def extract_and_process_image_from_pdf(pdf_data: bytes) -> tuple[bytes, str] | None:
+    """
+    Extract the first image from a PDF, process it (remove white and grey borders),
+    and return the processed image data and its SHA256 hash.
+
+    Returns:
+        Tuple of (image_bytes, sha256_hash) or None if no image found
+    """
+    try:
+        # Read PDF from bytes
+        pdf_stream = io.BytesIO(pdf_data)
+        reader = PdfReader(pdf_stream)
+
+        # Iterate through pages to find the first image
+        for page in reader.pages:
+            for image_file_object in page.images:
+                try:
+                    # Get image data
+                    image_data = image_file_object.data
+
+                    # Open image with PIL
+                    image = Image.open(io.BytesIO(image_data))
+
+                    # Convert to RGB if needed
+                    if image.mode in ("RGBA", "LA", "P"):
+                        # Create white background for transparent images
+                        rgb_img = Image.new("RGB", image.size, (255, 255, 255))
+                        if image.mode == "P":
+                            image = image.convert("RGBA")
+                        rgb_img.paste(
+                            image,
+                            mask=image.split()[-1] if image.mode == "RGBA" else None,
+                        )
+                        image = rgb_img
+                    elif image.mode != "RGB":
+                        image = image.convert("RGB")
+
+                    # Remove white border
+                    image = autocrop_white_border(image, threshold=250)
+
+                    # Remove grey border
+                    image = autocrop_grey_border(image, border_color=None, tolerance=60)
+
+                    # Convert processed image to bytes (PNG format)
+                    image_bytes = io.BytesIO()
+                    image.save(image_bytes, format="PNG")
+                    image_bytes = image_bytes.getvalue()
+
+                    # Calculate SHA256 hash of processed image
+                    image_hash = hashlib.sha256(image_bytes).hexdigest()
+
+                    return (image_bytes, image_hash)
+
+                except Exception as e:
+                    # Continue to next image if this one fails
+                    continue
+
+        # No image found
+        return None
+
+    except Exception as e:
+        # PDF reading or processing failed
+        return None
 
 
 @flask_app.route("/")
@@ -89,12 +161,29 @@ def upload_pdfs():
                         )
                         continue
 
+                    # Extract and process image from PDF
+                    image_result = extract_and_process_image_from_pdf(pdf_data)
+
+                    if image_result is None:
+                        results.append(
+                            {
+                                "filename": file.filename,
+                                "status": "error",
+                                "error": "No image found in PDF or failed to extract/process image",
+                            }
+                        )
+                        continue
+
+                    cropped_image_data, cropped_image_hash = image_result
+
                     # Create new recipe entry
                     recipe = Recipe(
                         original_pdf_data=pdf_data,
                         original_pdf_sha256=pdf_hash,
                         pdf_filename=file.filename,
                         pdf_upload_timestamp=datetime.utcnow(),
+                        cropped_image_data=cropped_image_data,
+                        cropped_image_sha256=cropped_image_hash,
                     )
 
                     session.add(recipe)
@@ -105,7 +194,7 @@ def upload_pdfs():
                         {
                             "filename": file.filename,
                             "status": "success",
-                            "message": "PDF stored successfully",
+                            "message": "PDF and processed image stored successfully",
                             "recipe_id": recipe.id,
                         }
                     )
