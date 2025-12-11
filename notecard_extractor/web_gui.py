@@ -287,6 +287,7 @@ def get_recipes():
                         "upload_timestamp": upload_time,
                         "pdf_filename": recipe.pdf_filename or "Unknown",
                         "pdf_size": pdf_size,
+                        "rotation": recipe.rotation or 0,
                     }
                 )
 
@@ -387,6 +388,40 @@ def get_recipe_medium(recipe_id: int):
                     "Content-Disposition": f"inline; filename=recipe_{recipe_id}_medium.png"
                 },
             )
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@flask_app.route("/api/recipe/<int:recipe_id>/rotation", methods=["POST"])
+def update_recipe_rotation(recipe_id: int):
+    """
+    Update the rotation value for a specific recipe.
+    Expects JSON: {"rotation": 0|90|180|270}
+    """
+    if db_engine is None:
+        return jsonify({"error": "Database not initialized"}), 500
+
+    try:
+        data = request.get_json()
+        if not data or "rotation" not in data:
+            return jsonify({"error": "Missing rotation in request"}), 400
+
+        rotation = int(data["rotation"])
+        if rotation not in [0, 90, 180, 270]:
+            return jsonify({"error": "Rotation must be 0, 90, 180, or 270"}), 400
+
+        with Session(db_engine) as session:
+            recipe = session.get(Recipe, recipe_id)
+
+            if not recipe:
+                return jsonify({"error": "Recipe not found"}), 404
+
+            recipe.rotation = rotation
+            session.add(recipe)
+            session.commit()
+
+            return jsonify({"success": True, "rotation": rotation})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500

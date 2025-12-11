@@ -296,6 +296,11 @@
             flex: 1;
         }
 
+        .rotation-column {
+            width: 80px;
+            text-align: center;
+        }
+
         .size-column {
             width: 100px;
             text-align: right;
@@ -319,11 +324,15 @@
             border: 1px solid #e0e0e0;
             cursor: pointer;
             transition: transform 0.2s, box-shadow 0.2s;
+            transform-origin: center center;
         }
 
         .thumbnail-img:hover {
-            transform: scale(1.05);
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        
+        .thumbnail-img:hover {
+            filter: brightness(1.1);
         }
 
         .preview-icon {
@@ -360,14 +369,59 @@
             max-width: 90%;
             max-height: 90%;
             position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
 
         .image-overlay-content img {
             max-width: 100%;
-            max-height: 90vh;
+            max-height: 80vh;
             border: 3px solid white;
             border-radius: 8px;
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            transition: transform 0.3s ease;
+            transform-origin: center center;
+        }
+
+        .rotation-controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .rotation-button {
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid white;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1.5em;
+            transition: all 0.2s;
+            color: #667eea;
+        }
+
+        .rotation-button:hover {
+            background: white;
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .rotation-button:active {
+            transform: scale(0.95);
+        }
+
+        .rotation-display {
+            color: white;
+            font-size: 1.1em;
+            font-weight: 600;
+            min-width: 80px;
+            text-align: center;
         }
 
         .image-overlay-close {
@@ -528,6 +582,7 @@
                             <th class="timestamp-column">Upload Date/Time</th>
                             <th class="filename-column">PDF Name</th>
                             <th class="size-column">Size</th>
+                            <th class="rotation-column">Rotation</th>
                             <th class="preview-column">Preview</th>
                         </tr>
                     </thead>
@@ -548,6 +603,11 @@
             <div class="image-overlay-content">
                 <div class="image-overlay-close" id="imageOverlayClose">×</div>
                 <img id="previewImage" src="" alt="Recipe Preview">
+                <div class="rotation-controls">
+                    <div class="rotation-button" id="rotateCounterClockwise" title="Rotate counter-clockwise">↶</div>
+                    <div class="rotation-display" id="rotationDisplay">0°</div>
+                    <div class="rotation-button" id="rotateClockwise" title="Rotate clockwise">↷</div>
+                </div>
             </div>
         </div>
     </div>
@@ -868,8 +928,10 @@
                 const previewIcon = recipe.id 
                     ? `<span class="preview-icon" data-recipe-id="${recipe.id}" title="Preview image">🔍</span>`
                     : '<span style="color: #ccc;">—</span>';
+                const rotation = recipe.rotation !== undefined ? recipe.rotation : 0;
+                const rotationDeg = `${rotation}°`;
                 const thumbnail = recipe.id
-                    ? `<img src="/api/recipe/${recipe.id}/thumbnail" alt="Thumbnail" class="thumbnail-img" data-recipe-id="${recipe.id}" title="Click to preview">`
+                    ? `<img src="/api/recipe/${recipe.id}/thumbnail" alt="Thumbnail" class="thumbnail-img" data-recipe-id="${recipe.id}" data-rotation="${rotation}" style="transform: rotate(${rotation}deg);" title="Click to preview">`
                     : '<span style="color: #ccc;">—</span>';
                 row.innerHTML = `
                     <td class="count-column">${recipe.count}</td>
@@ -877,6 +939,7 @@
                     <td class="timestamp-column">${formatTimestamp(recipe.upload_timestamp)}</td>
                     <td class="filename-column">${escapeHtml(recipe.pdf_filename)}</td>
                     <td class="size-column">${formatFileSize(recipe.pdf_size)}</td>
+                    <td class="rotation-column">${rotationDeg}</td>
                     <td class="preview-column">${previewIcon}</td>
                 `;
                 recipesTableBody.appendChild(row);
@@ -928,17 +991,123 @@
         const imageOverlay = document.getElementById('imageOverlay');
         const previewImage = document.getElementById('previewImage');
         const imageOverlayClose = document.getElementById('imageOverlayClose');
+        const rotateClockwise = document.getElementById('rotateClockwise');
+        const rotateCounterClockwise = document.getElementById('rotateCounterClockwise');
+        const rotationDisplay = document.getElementById('rotationDisplay');
+        
+        let currentRecipeId = null;
+        let currentRotation = 0;
 
         function showImagePreview(recipeId) {
-            // Use full image for detailed preview
-            const imageUrl = `/api/recipe/${recipeId}/image`;
-            previewImage.src = imageUrl;
-            imageOverlay.classList.add('active');
+            currentRecipeId = recipeId;
+            
+            // Reset rotation display while loading
+            rotationDisplay.textContent = 'Loading...';
+            
+            // Get current rotation from the recipe data first, then show image
+            fetch(`/api/recipes`)
+                .then(response => response.json())
+                .then(data => {
+                    const recipe = data.recipes.find(r => r.id === recipeId);
+                    if (recipe) {
+                        currentRotation = recipe.rotation || 0;
+                    } else {
+                        currentRotation = 0;
+                    }
+                    
+                    // Apply rotation before showing image
+                    updateRotationDisplay();
+                    updateImageRotation();
+                    
+                    // Use full image for detailed preview
+                    const imageUrl = `/api/recipe/${recipeId}/image`;
+                    previewImage.src = imageUrl;
+                    imageOverlay.classList.add('active');
+                })
+                .catch(err => {
+                    console.error('Error fetching rotation:', err);
+                    currentRotation = 0;
+                    updateRotationDisplay();
+                    updateImageRotation();
+                    
+                    // Use full image for detailed preview
+                    const imageUrl = `/api/recipe/${recipeId}/image`;
+                    previewImage.src = imageUrl;
+                    imageOverlay.classList.add('active');
+                });
         }
+
+        function updateRotationDisplay() {
+            rotationDisplay.textContent = `${currentRotation}°`;
+        }
+
+        function updateImageRotation() {
+            previewImage.style.transform = `rotate(${currentRotation}deg)`;
+        }
+
+        async function rotateImage(direction) {
+            if (!currentRecipeId) return;
+            
+            // Calculate new rotation
+            if (direction === 'clockwise') {
+                currentRotation = (currentRotation + 90) % 360;
+            } else {
+                currentRotation = (currentRotation - 90 + 360) % 360;
+            }
+            
+            // Update display immediately for responsive UI
+            updateRotationDisplay();
+            updateImageRotation();
+            
+            // Update database
+            try {
+                const response = await fetch(`/api/recipe/${currentRecipeId}/rotation`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ rotation: currentRotation })
+                });
+                
+                if (!response.ok) {
+                    const data = await response.json();
+                    throw new Error(data.error || 'Failed to update rotation');
+                }
+                
+                // Reload recipes to update the view tab (this will update thumbnails with new rotation)
+                if (document.getElementById('view-tab').classList.contains('active')) {
+                    loadRecipes();
+                }
+            } catch (error) {
+                console.error('Error updating rotation:', error);
+                // Revert on error
+                if (direction === 'clockwise') {
+                    currentRotation = (currentRotation - 90 + 360) % 360;
+                } else {
+                    currentRotation = (currentRotation + 90) % 360;
+                }
+                updateRotationDisplay();
+                updateImageRotation();
+            }
+        }
+
+        rotateClockwise.addEventListener('click', function(e) {
+            e.stopPropagation();
+            rotateImage('clockwise');
+        });
+
+        rotateCounterClockwise.addEventListener('click', function(e) {
+            e.stopPropagation();
+            rotateImage('counterclockwise');
+        });
 
         function hideImagePreview() {
             imageOverlay.classList.remove('active');
             previewImage.src = '';
+            previewImage.style.transform = '';
+            previewImage.style.transformOrigin = 'center center';
+            currentRecipeId = null;
+            currentRotation = 0;
         }
 
         // Close overlay when clicking close button, overlay background, or pressing Escape
