@@ -297,6 +297,76 @@ def get_recipes():
         return jsonify({"error": str(e)}), 500
 
 
+@flask_app.route("/api/recipe/<int:recipe_id>", methods=["GET"])
+def get_recipe(recipe_id: int):
+    """
+    Get full details for a specific recipe.
+    """
+    if db_engine is None:
+        return jsonify({"error": "Database not initialized"}), 500
+
+    try:
+        with Session(db_engine) as session:
+            recipe = session.get(Recipe, recipe_id)
+
+            if not recipe:
+                return jsonify({"error": "Recipe not found"}), 404
+
+            # Build response with all fields
+            result = {
+                "id": recipe.id,
+                "pdf_filename": recipe.pdf_filename,
+                "pdf_upload_timestamp": (
+                    recipe.pdf_upload_timestamp.isoformat()
+                    if recipe.pdf_upload_timestamp
+                    else None
+                ),
+                "original_pdf_sha256": recipe.original_pdf_sha256,
+                "original_pdf_size": len(recipe.original_pdf_data)
+                if recipe.original_pdf_data
+                else 0,
+                "cropped_image_sha256": recipe.cropped_image_sha256,
+                "cropped_image_size": len(recipe.cropped_image_data)
+                if recipe.cropped_image_data
+                else 0,
+                "medium_image_sha256": recipe.medium_image_sha256,
+                "medium_image_size": len(recipe.medium_image_data)
+                if recipe.medium_image_data
+                else 0,
+                "thumbnail_sha256": recipe.thumbnail_sha256,
+                "thumbnail_size": len(recipe.thumbnail_data)
+                if recipe.thumbnail_data
+                else 0,
+                "rotation": recipe.rotation or 0,
+                "state": recipe.state.value if recipe.state else "not_started",
+                "title": recipe.title,
+                "description": recipe.description,
+                "year": recipe.year,
+                "author": recipe.author,
+                "ingredients": recipe.ingredients,
+                "recipe": recipe.recipe,
+                "cook_time": recipe.cook_time,
+                "notes": recipe.notes,
+                "dish_picture_1_size": len(recipe.dish_picture_1)
+                if recipe.dish_picture_1
+                else 0,
+                "dish_picture_2_size": len(recipe.dish_picture_2)
+                if recipe.dish_picture_2
+                else 0,
+                "dish_picture_3_size": len(recipe.dish_picture_3)
+                if recipe.dish_picture_3
+                else 0,
+                "dish_picture_4_size": len(recipe.dish_picture_4)
+                if recipe.dish_picture_4
+                else 0,
+            }
+
+            return jsonify(result)
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @flask_app.route("/api/recipe/<int:recipe_id>/image", methods=["GET"])
 def get_recipe_image(recipe_id: int):
     """
