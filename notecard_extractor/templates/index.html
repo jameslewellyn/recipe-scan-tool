@@ -346,10 +346,43 @@
             text-align: center;
         }
 
-        .size-column {
-            width: 100px;
-            text-align: right;
-            font-family: monospace;
+        .state-column {
+            width: 150px;
+            text-align: center;
+        }
+
+        .state-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 600;
+            text-transform: capitalize;
+        }
+
+        .state-not_started {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .state-partially_complete {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+
+        .state-complete {
+            background: #e8f5e9;
+            color: #388e3c;
+        }
+
+        .state-broken {
+            background: #ffebee;
+            color: #d32f2f;
+        }
+
+        .state-duplicate {
+            background: #f3e5f5;
+            color: #7b1fa2;
         }
 
         .preview-column {
@@ -626,7 +659,7 @@
                             <th class="thumbnail-column">Thumbnail</th>
                             <th class="timestamp-column">Upload Date/Time</th>
                             <th class="filename-column">PDF Name</th>
-                            <th class="size-column">Size</th>
+                            <th class="state-column">State</th>
                             <th class="rotation-column">Rotation</th>
                             <th class="preview-column">Preview</th>
                         </tr>
@@ -984,12 +1017,18 @@
                 const thumbnail = recipe.id
                     ? `<img src="/api/recipe/${recipe.id}/thumbnail" alt="Thumbnail" class="thumbnail-img" data-recipe-id="${recipe.id}" data-rotation="${rotation}" style="transform: rotate(${rotation}deg);" title="Click to preview">`
                     : '<span style="color: #ccc;">—</span>';
+                
+                // Format state with emoji and badge
+                const state = recipe.state || 'not_started';
+                const stateInfo = getStateInfo(state);
+                const stateBadge = `<span class="state-badge state-${state}">${stateInfo.emoji} ${stateInfo.label}</span>`;
+                
                 row.innerHTML = `
                     <td class="count-column">${recipe.count}</td>
                     <td class="thumbnail-column">${thumbnail}</td>
                     <td class="timestamp-column">${formatTimestamp(recipe.upload_timestamp)}</td>
                     <td class="filename-column">${escapeHtml(recipe.pdf_filename)}</td>
-                    <td class="size-column">${formatFileSize(recipe.pdf_size)}</td>
+                    <td class="state-column">${stateBadge}</td>
                     <td class="rotation-column">${rotationDeg}</td>
                     <td class="preview-column">${previewIcon}</td>
                 `;
@@ -1066,6 +1105,17 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        function getStateInfo(state) {
+            const stateMap = {
+                'not_started': { emoji: '⏳', label: 'Not Started' },
+                'partially_complete': { emoji: '🔄', label: 'In Progress' },
+                'complete': { emoji: '✅', label: 'Complete' },
+                'broken': { emoji: '❌', label: 'Broken' },
+                'duplicate': { emoji: '📋', label: 'Duplicate' }
+            };
+            return stateMap[state] || { emoji: '❓', label: 'Unknown' };
         }
 
         let expandedRecipeId = null;

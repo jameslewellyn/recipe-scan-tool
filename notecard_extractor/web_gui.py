@@ -288,6 +288,7 @@ def get_recipes():
                         "pdf_filename": recipe.pdf_filename or "Unknown",
                         "pdf_size": pdf_size,
                         "rotation": recipe.rotation or 0,
+                        "state": recipe.state.value if recipe.state else "not_started",
                     }
                 )
 
