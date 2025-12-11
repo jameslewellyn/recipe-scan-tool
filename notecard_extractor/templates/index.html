@@ -301,6 +301,76 @@
             text-align: right;
             font-family: monospace;
         }
+
+        .preview-column {
+            width: 80px;
+            text-align: center;
+        }
+
+        .preview-icon {
+            cursor: pointer;
+            font-size: 1.2em;
+            color: #667eea;
+            transition: transform 0.2s, color 0.2s;
+        }
+
+        .preview-icon:hover {
+            transform: scale(1.2);
+            color: #764ba2;
+        }
+
+        .image-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .image-overlay.active {
+            display: flex;
+        }
+
+        .image-overlay-content {
+            max-width: 90%;
+            max-height: 90%;
+            position: relative;
+        }
+
+        .image-overlay-content img {
+            max-width: 100%;
+            max-height: 90vh;
+            border: 3px solid white;
+            border-radius: 8px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        .image-overlay-close {
+            position: absolute;
+            top: -40px;
+            right: 0;
+            color: white;
+            font-size: 2em;
+            cursor: pointer;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+
+        .image-overlay-close:hover {
+            background: rgba(0, 0, 0, 0.8);
+        }
     </style>
 </head>
 <body>
@@ -389,6 +459,7 @@
                             <th class="timestamp-column">Upload Date/Time</th>
                             <th class="filename-column">PDF Name</th>
                             <th class="size-column">Size</th>
+                            <th class="preview-column">Preview</th>
                         </tr>
                     </thead>
                     <tbody id="recipesTableBody">
@@ -400,6 +471,14 @@
             <div id="viewEmptyState" class="empty-state">
                 <div class="empty-state-icon">📄</div>
                 <p>No PDFs uploaded yet. Use the Upload tab to add PDFs to the database.</p>
+            </div>
+        </div>
+
+        <!-- Image Preview Overlay -->
+        <div id="imageOverlay" class="image-overlay">
+            <div class="image-overlay-content">
+                <div class="image-overlay-close" id="imageOverlayClose">×</div>
+                <img id="previewImage" src="" alt="Recipe Preview">
             </div>
         </div>
     </div>
@@ -666,13 +745,28 @@
             recipesTableBody.innerHTML = '';
             recipes.forEach(recipe => {
                 const row = document.createElement('tr');
+                const previewIcon = recipe.id 
+                    ? `<span class="preview-icon" data-recipe-id="${recipe.id}" title="Preview image">🔍</span>`
+                    : '<span style="color: #ccc;">—</span>';
                 row.innerHTML = `
                     <td class="count-column">${recipe.count}</td>
                     <td class="timestamp-column">${formatTimestamp(recipe.upload_timestamp)}</td>
                     <td class="filename-column">${escapeHtml(recipe.pdf_filename)}</td>
                     <td class="size-column">${formatFileSize(recipe.pdf_size)}</td>
+                    <td class="preview-column">${previewIcon}</td>
                 `;
                 recipesTableBody.appendChild(row);
+            });
+
+            // Add click handlers for preview icons
+            document.querySelectorAll('.preview-icon').forEach(icon => {
+                icon.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const recipeId = this.getAttribute('data-recipe-id');
+                    if (recipeId) {
+                        showImagePreview(recipeId);
+                    }
+                });
             });
 
             recipesTableContainer.style.display = 'block';
@@ -694,6 +788,36 @@
             div.textContent = text;
             return div.innerHTML;
         }
+
+        // Image preview functionality
+        const imageOverlay = document.getElementById('imageOverlay');
+        const previewImage = document.getElementById('previewImage');
+        const imageOverlayClose = document.getElementById('imageOverlayClose');
+
+        function showImagePreview(recipeId) {
+            const imageUrl = `/api/recipe/${recipeId}/image`;
+            previewImage.src = imageUrl;
+            imageOverlay.classList.add('active');
+        }
+
+        function hideImagePreview() {
+            imageOverlay.classList.remove('active');
+            previewImage.src = '';
+        }
+
+        // Close overlay when clicking close button, overlay background, or pressing Escape
+        imageOverlayClose.addEventListener('click', hideImagePreview);
+        imageOverlay.addEventListener('click', function(e) {
+            if (e.target === imageOverlay) {
+                hideImagePreview();
+            }
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && imageOverlay.classList.contains('active')) {
+                hideImagePreview();
+            }
+        });
 
         // Load recipes on page load if View tab is active
         if (document.getElementById('view-tab').classList.contains('active')) {

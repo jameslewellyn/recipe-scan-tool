@@ -4,7 +4,7 @@ Web GUI for the notecard extractor tool.
 Provides a browser-based interface for uploading PDF files and storing them in the database.
 """
 
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, Response
 from pathlib import Path
 from typing import Annotated, Optional
 import typer
@@ -252,6 +252,38 @@ def get_recipes():
                 )
 
             return jsonify({"recipes": results, "total": len(results)})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@flask_app.route("/api/recipe/<int:recipe_id>/image", methods=["GET"])
+def get_recipe_image(recipe_id: int):
+    """
+    Get the processed image for a specific recipe.
+    Returns the cropped image data as PNG.
+    """
+    if db_engine is None:
+        return jsonify({"error": "Database not initialized"}), 500
+
+    try:
+        with Session(db_engine) as session:
+            recipe = session.get(Recipe, recipe_id)
+
+            if not recipe:
+                return jsonify({"error": "Recipe not found"}), 404
+
+            if not recipe.cropped_image_data:
+                return jsonify({"error": "No processed image available"}), 404
+
+            # Return image as PNG
+            return Response(
+                recipe.cropped_image_data,
+                mimetype="image/png",
+                headers={
+                    "Content-Disposition": f"inline; filename=recipe_{recipe_id}.png"
+                },
+            )
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
