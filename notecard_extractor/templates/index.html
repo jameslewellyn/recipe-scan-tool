@@ -660,8 +660,8 @@
                             <th class="timestamp-column">Upload Date/Time</th>
                             <th class="filename-column">PDF Name</th>
                             <th class="state-column">State</th>
-                            <th class="rotation-column">Rotation</th>
-                            <th class="preview-column">Preview</th>
+                            <th class="expand-column">Expand</th>
+                            <th class="image-column">Image</th>
                         </tr>
                     </thead>
                     <tbody id="recipesTableBody">
@@ -1013,7 +1013,6 @@
                     ? `<span class="preview-icon" data-recipe-id="${recipe.id}" title="Preview image">🔍</span>`
                     : '<span style="color: #ccc;">—</span>';
                 const rotation = recipe.rotation !== undefined ? recipe.rotation : 0;
-                const rotationDeg = `${rotation}°`;
                 const thumbnail = recipe.id
                     ? `<img src="/api/recipe/${recipe.id}/thumbnail" alt="Thumbnail" class="thumbnail-img" data-recipe-id="${recipe.id}" data-rotation="${rotation}" style="transform: rotate(${rotation}deg);" title="Click to preview">`
                     : '<span style="color: #ccc;">—</span>';
@@ -1023,14 +1022,17 @@
                 const stateInfo = getStateInfo(state);
                 const stateBadge = `<span class="state-badge state-${state}">${stateInfo.emoji} ${stateInfo.label}</span>`;
                 
+                // Expand icon
+                const expandIcon = `<span class="expand-icon" data-recipe-id="${recipe.id}" title="Expand row">➕</span>`;
+                
                 row.innerHTML = `
                     <td class="count-column">${recipe.count}</td>
                     <td class="thumbnail-column">${thumbnail}</td>
                     <td class="timestamp-column">${formatTimestamp(recipe.upload_timestamp)}</td>
                     <td class="filename-column">${escapeHtml(recipe.pdf_filename)}</td>
                     <td class="state-column">${stateBadge}</td>
-                    <td class="rotation-column">${rotationDeg}</td>
-                    <td class="preview-column">${previewIcon}</td>
+                    <td class="expand-column">${expandIcon}</td>
+                    <td class="image-column">${previewIcon}</td>
                 `;
                 recipesTableBody.appendChild(row);
 
@@ -1039,7 +1041,7 @@
                 expandRow.className = 'expandable-row-content';
                 expandRow.setAttribute('data-recipe-id', recipe.id || '');
                 const expandCell = document.createElement('td');
-                expandCell.colSpan = 7;
+                expandCell.colSpan = 7; // Count, Thumbnail, Timestamp, Filename, State, Expand, Image
                 expandCell.innerHTML = '<div class="detail-grid"><div class="detail-label">Loading...</div><div class="detail-value"></div></div>';
                 expandRow.appendChild(expandCell);
                 recipesTableBody.appendChild(expandRow);
@@ -1052,22 +1054,20 @@
                     }
                     toggleRowExpansion(recipe.id);
                 });
+
+                // Add click handler to expand icon
+                const expandIconElement = row.querySelector('.expand-icon');
+                if (expandIconElement) {
+                    expandIconElement.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        toggleRowExpansion(recipe.id);
+                    });
+                }
             });
 
             // Add click handlers for thumbnails
             document.querySelectorAll('.thumbnail-img').forEach(thumbnail => {
                 thumbnail.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    const recipeId = this.getAttribute('data-recipe-id');
-                    if (recipeId) {
-                        showImagePreview(recipeId);
-                    }
-                });
-            });
-
-            // Add click handlers for preview icons
-            document.querySelectorAll('.preview-icon').forEach(icon => {
-                icon.addEventListener('click', function(e) {
                     e.stopPropagation();
                     const recipeId = this.getAttribute('data-recipe-id');
                     if (recipeId) {
@@ -1123,6 +1123,7 @@
         async function toggleRowExpansion(recipeId) {
             const expandRow = document.querySelector(`.expandable-row-content[data-recipe-id="${recipeId}"]`);
             const mainRow = document.querySelector(`tr.expandable[data-recipe-id="${recipeId}"]`);
+            const expandIcon = document.querySelector(`.expand-icon[data-recipe-id="${recipeId}"]`);
             
             if (!expandRow || !mainRow) return;
 
@@ -1130,6 +1131,7 @@
             if (expandedRecipeId === recipeId) {
                 expandRow.classList.remove('expanded');
                 mainRow.classList.remove('expanded');
+                if (expandIcon) expandIcon.classList.remove('expanded');
                 expandedRecipeId = null;
                 return;
             }
@@ -1138,13 +1140,16 @@
             if (expandedRecipeId !== null) {
                 const prevExpandRow = document.querySelector(`.expandable-row-content[data-recipe-id="${expandedRecipeId}"]`);
                 const prevMainRow = document.querySelector(`tr.expandable[data-recipe-id="${expandedRecipeId}"]`);
+                const prevExpandIcon = document.querySelector(`.expand-icon[data-recipe-id="${expandedRecipeId}"]`);
                 if (prevExpandRow) prevExpandRow.classList.remove('expanded');
                 if (prevMainRow) prevMainRow.classList.remove('expanded');
+                if (prevExpandIcon) prevExpandIcon.classList.remove('expanded');
             }
 
             // Expand new row
             expandRow.classList.add('expanded');
             mainRow.classList.add('expanded');
+            if (expandIcon) expandIcon.classList.add('expanded');
             expandedRecipeId = recipeId;
 
             // Load recipe details if not already loaded
