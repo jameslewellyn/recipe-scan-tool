@@ -33,7 +33,8 @@ class RotationAngle(int, Enum):
 class Recipe(SQLModel, table=True):
     """
     Recipe table model.
-    Stores recipe data including original PDF, cropped images, and metadata.
+    Stores recipe data including original PDF and metadata.
+    Images are stored in the RecipeImage table.
     """
 
     # Primary key
@@ -48,23 +49,6 @@ class Recipe(SQLModel, table=True):
     pdf_upload_timestamp: Optional[datetime] = Field(
         default=None, sa_column=Column(DateTime)
     )
-
-    # Cropped image data
-    cropped_image_data: Optional[bytes] = Field(
-        default=None, sa_column=Column(LargeBinary)
-    )
-    cropped_image_sha256: Optional[str] = Field(default=None, index=True, max_length=64)
-
-    # Medium and thumbnail versions
-    medium_image_data: Optional[bytes] = Field(
-        default=None, sa_column=Column(LargeBinary)
-    )
-    medium_image_sha256: Optional[str] = Field(default=None, index=True, max_length=64)
-    thumbnail_data: Optional[bytes] = Field(default=None, sa_column=Column(LargeBinary))
-    thumbnail_sha256: Optional[str] = Field(default=None, index=True, max_length=64)
-
-    # Rotation (0, 90, 180, or 270 degrees)
-    rotation: int = Field(default=0, ge=0, le=270)
 
     # Recipe state
     state: RecipeState = Field(default=RecipeState.NOT_STARTED)
@@ -86,3 +70,37 @@ class Recipe(SQLModel, table=True):
     dish_picture_2: Optional[bytes] = Field(default=None, sa_column=Column(LargeBinary))
     dish_picture_3: Optional[bytes] = Field(default=None, sa_column=Column(LargeBinary))
     dish_picture_4: Optional[bytes] = Field(default=None, sa_column=Column(LargeBinary))
+
+
+class RecipeImage(SQLModel, table=True):
+    """
+    RecipeImage table model.
+    Stores images extracted from PDF pages, associated with a Recipe.
+    Each page of a PDF gets one RecipeImage entry.
+    """
+
+    # Primary key
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    # Foreign key to Recipe
+    recipe_id: int = Field(foreign_key="recipe.id", index=True)
+
+    # PDF page number (0-indexed, where 0 is the first page)
+    pdf_page_number: int = Field(default=0, ge=0)
+
+    # Rotation (0, 90, 180, or 270 degrees)
+    rotation: int = Field(default=0, ge=0, le=270)
+
+    # Cropped image data
+    cropped_image_data: Optional[bytes] = Field(
+        default=None, sa_column=Column(LargeBinary)
+    )
+    cropped_image_sha256: Optional[str] = Field(default=None, index=True, max_length=64)
+
+    # Medium and thumbnail versions
+    medium_image_data: Optional[bytes] = Field(
+        default=None, sa_column=Column(LargeBinary)
+    )
+    medium_image_sha256: Optional[str] = Field(default=None, index=True, max_length=64)
+    thumbnail_data: Optional[bytes] = Field(default=None, sa_column=Column(LargeBinary))
+    thumbnail_sha256: Optional[str] = Field(default=None, index=True, max_length=64)

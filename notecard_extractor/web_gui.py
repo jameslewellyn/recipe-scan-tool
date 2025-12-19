@@ -14,7 +14,7 @@ from datetime import datetime
 from pypdf import PdfReader
 from PIL import Image
 from sqlmodel import SQLModel, create_engine, Session
-from notecard_extractor.database import Recipe, RecipeState
+from notecard_extractor.database import Recipe, RecipeState, RecipeImage
 from notecard_extractor.image_processing import (
     autocrop_white_border,
     autocrop_grey_border,
@@ -32,22 +32,24 @@ db_engine = None
 
 def extract_and_process_image_from_pdf(
     pdf_data: bytes,
-) -> tuple[bytes, str, bytes, str, bytes, str] | None:
+) -> list[tuple[int, bytes, str, bytes, str, bytes, str]]:
     """
-    Extract the first image from a PDF, process it (remove white and grey borders),
+    Extract images from each page of a PDF, process them (remove white and grey borders),
     and create thumbnail and medium versions.
 
     Returns:
-        Tuple of (full_image_bytes, full_image_hash, medium_image_bytes, medium_image_hash,
-                  thumbnail_bytes, thumbnail_hash) or None if no image found
+        List of tuples, each containing (page_num, full_image_bytes, full_image_hash,
+        medium_image_bytes, medium_image_hash, thumbnail_bytes, thumbnail_hash).
+        Returns empty list if no images found.
     """
+    results = []
     try:
         # Read PDF from bytes
         pdf_stream = io.BytesIO(pdf_data)
         reader = PdfReader(pdf_stream)
 
-        # Iterate through pages to find the first image
-        for page in reader.pages:
+        # Iterate through pages to extract one image per page
+        for page_num, page in enumerate(reader.pages):
             for image_file_object in page.images:
                 try:
                     # Get image data
@@ -102,25 +104,30 @@ def extract_and_process_image_from_pdf(
                     thumbnail_bytes = thumbnail_bytes.getvalue()
                     thumbnail_hash = hashlib.sha256(thumbnail_bytes).hexdigest()
 
-                    return (
-                        image_bytes,
-                        image_hash,
-                        medium_bytes,
-                        medium_hash,
-                        thumbnail_bytes,
-                        thumbnail_hash,
+                    results.append(
+                        (
+                            page_num,
+                            image_bytes,
+                            image_hash,
+                            medium_bytes,
+                            medium_hash,
+                            thumbnail_bytes,
+                            thumbnail_hash,
+                        )
                     )
+
+                    # Only extract the first image from each page
+                    break
 
                 except Exception as e:
                     # Continue to next image if this one fails
                     continue
 
-        # No image found
-        return None
+        return results
 
     except Exception as e:
         # PDF reading or processing failed
-        return None
+        return []
 
 
 @flask_app.route("/")
@@ -189,10 +196,10 @@ def upload_pdfs():
                         )
                         continue
 
-                    # Extract and process image from PDF
-                    image_result = extract_and_process_image_from_pdf(pdf_data)
+                    # Extract and process images from PDF (one per page)
+                    image_results = extract_and_process_image_from_pdf(pdf_data)
 
-                    if image_result is None:
+                    if not image_results:
                         results.append(
                             {
                                 "filename": file.filename,
@@ -202,38 +209,49 @@ def upload_pdfs():
                         )
                         continue
 
-                    (
-                        cropped_image_data,
-                        cropped_image_hash,
-                        medium_image_data,
-                        medium_image_hash,
-                        thumbnail_data,
-                        thumbnail_hash,
-                    ) = image_result
-
-                    # Create new recipe entry
+                    # Create a single recipe entry (without image data)
                     recipe = Recipe(
                         original_pdf_data=pdf_data,
                         original_pdf_sha256=pdf_hash,
                         pdf_filename=file.filename,
                         pdf_upload_timestamp=datetime.utcnow(),
-                        cropped_image_data=cropped_image_data,
-                        cropped_image_sha256=cropped_image_hash,
-                        medium_image_data=medium_image_data,
-                        medium_image_sha256=medium_image_hash,
-                        thumbnail_data=thumbnail_data,
-                        thumbnail_sha256=thumbnail_hash,
                     )
 
                     session.add(recipe)
                     session.commit()
                     session.refresh(recipe)
 
+                    # Create RecipeImage entries for each page
+                    for (
+                        page_num,
+                        cropped_image_data,
+                        cropped_image_hash,
+                        medium_image_data,
+                        medium_image_hash,
+                        thumbnail_data,
+                        thumbnail_hash,
+                    ) in image_results:
+                        recipe_image = RecipeImage(
+                            recipe_id=recipe.id,
+                            pdf_page_number=page_num,
+                            rotation=0,
+                            cropped_image_data=cropped_image_data,
+                            cropped_image_sha256=cropped_image_hash,
+                            medium_image_data=medium_image_data,
+                            medium_image_sha256=medium_image_hash,
+                            thumbnail_data=thumbnail_data,
+                            thumbnail_sha256=thumbnail_hash,
+                        )
+
+                        session.add(recipe_image)
+
+                    session.commit()
+
                     results.append(
                         {
                             "filename": file.filename,
                             "status": "success",
-                            "message": "PDF and processed image stored successfully",
+                            "message": f"PDF with {len(image_results)} page(s) stored successfully",
                             "recipe_id": recipe.id,
                         }
                     )
@@ -280,6 +298,15 @@ def get_recipes():
                     else None
                 )
 
+                # Get rotation from page 1 image (pdf_page_number = 0)
+                recipe_image = (
+                    session.query(RecipeImage)
+                    .filter(RecipeImage.recipe_id == recipe.id)
+                    .filter(RecipeImage.pdf_page_number == 0)
+                    .first()
+                )
+                rotation = recipe_image.rotation if recipe_image else 0
+
                 results.append(
                     {
                         "id": recipe.id,
@@ -287,7 +314,7 @@ def get_recipes():
                         "upload_timestamp": upload_time,
                         "pdf_filename": recipe.pdf_filename or "Unknown",
                         "pdf_size": pdf_size,
-                        "rotation": recipe.rotation or 0,
+                        "rotation": rotation,
                         "state": recipe.state.value if recipe.state else "not_started",
                     }
                 )
@@ -313,6 +340,44 @@ def get_recipe(recipe_id: int):
             if not recipe:
                 return jsonify({"error": "Recipe not found"}), 404
 
+            # Get all RecipeImage entries for this recipe
+            recipe_images = (
+                session.query(RecipeImage)
+                .filter(RecipeImage.recipe_id == recipe_id)
+                .order_by(RecipeImage.pdf_page_number)
+                .all()
+            )
+
+            # Get page 1 image (pdf_page_number = 0) for main image data
+            recipe_image_page1 = (
+                session.query(RecipeImage)
+                .filter(RecipeImage.recipe_id == recipe_id)
+                .filter(RecipeImage.pdf_page_number == 0)
+                .first()
+            )
+
+            # Build list of all pages
+            pages = []
+            for img in recipe_images:
+                pages.append(
+                    {
+                        "pdf_page_number": img.pdf_page_number,
+                        "rotation": img.rotation,
+                        "cropped_image_sha256": img.cropped_image_sha256,
+                        "cropped_image_size": len(img.cropped_image_data)
+                        if img.cropped_image_data
+                        else 0,
+                        "medium_image_sha256": img.medium_image_sha256,
+                        "medium_image_size": len(img.medium_image_data)
+                        if img.medium_image_data
+                        else 0,
+                        "thumbnail_sha256": img.thumbnail_sha256,
+                        "thumbnail_size": len(img.thumbnail_data)
+                        if img.thumbnail_data
+                        else 0,
+                    }
+                )
+
             # Build response with all fields
             result = {
                 "id": recipe.id,
@@ -326,19 +391,25 @@ def get_recipe(recipe_id: int):
                 "original_pdf_size": len(recipe.original_pdf_data)
                 if recipe.original_pdf_data
                 else 0,
-                "cropped_image_sha256": recipe.cropped_image_sha256,
-                "cropped_image_size": len(recipe.cropped_image_data)
-                if recipe.cropped_image_data
+                "cropped_image_sha256": recipe_image_page1.cropped_image_sha256
+                if recipe_image_page1
+                else None,
+                "cropped_image_size": len(recipe_image_page1.cropped_image_data)
+                if recipe_image_page1 and recipe_image_page1.cropped_image_data
                 else 0,
-                "medium_image_sha256": recipe.medium_image_sha256,
-                "medium_image_size": len(recipe.medium_image_data)
-                if recipe.medium_image_data
+                "medium_image_sha256": recipe_image_page1.medium_image_sha256
+                if recipe_image_page1
+                else None,
+                "medium_image_size": len(recipe_image_page1.medium_image_data)
+                if recipe_image_page1 and recipe_image_page1.medium_image_data
                 else 0,
-                "thumbnail_sha256": recipe.thumbnail_sha256,
-                "thumbnail_size": len(recipe.thumbnail_data)
-                if recipe.thumbnail_data
+                "thumbnail_sha256": recipe_image_page1.thumbnail_sha256
+                if recipe_image_page1
+                else None,
+                "thumbnail_size": len(recipe_image_page1.thumbnail_data)
+                if recipe_image_page1 and recipe_image_page1.thumbnail_data
                 else 0,
-                "rotation": recipe.rotation or 0,
+                "rotation": recipe_image_page1.rotation if recipe_image_page1 else 0,
                 "state": recipe.state.value if recipe.state else "not_started",
                 "title": recipe.title,
                 "description": recipe.description,
@@ -360,6 +431,8 @@ def get_recipe(recipe_id: int):
                 "dish_picture_4_size": len(recipe.dish_picture_4)
                 if recipe.dish_picture_4
                 else 0,
+                "pages": pages,
+                "total_pages": len(pages),
             }
 
             return jsonify(result)
@@ -371,7 +444,7 @@ def get_recipe(recipe_id: int):
 @flask_app.route("/api/recipe/<int:recipe_id>/image", methods=["GET"])
 def get_recipe_image(recipe_id: int):
     """
-    Get the processed image for a specific recipe.
+    Get the processed image for a specific recipe (page 1).
     Returns the cropped image data as PNG.
     """
     if db_engine is None:
@@ -384,12 +457,22 @@ def get_recipe_image(recipe_id: int):
             if not recipe:
                 return jsonify({"error": "Recipe not found"}), 404
 
-            if not recipe.cropped_image_data:
-                return jsonify({"error": "No processed image available"}), 404
+            # Get page 1 image (pdf_page_number = 0)
+            recipe_image = (
+                session.query(RecipeImage)
+                .filter(RecipeImage.recipe_id == recipe_id)
+                .filter(RecipeImage.pdf_page_number == 0)
+                .first()
+            )
+
+            if not recipe_image or not recipe_image.cropped_image_data:
+                return jsonify(
+                    {"error": "No processed image available for page 1"}
+                ), 404
 
             # Return image as PNG
             return Response(
-                recipe.cropped_image_data,
+                recipe_image.cropped_image_data,
                 mimetype="image/png",
                 headers={
                     "Content-Disposition": f"inline; filename=recipe_{recipe_id}.png"
@@ -403,7 +486,7 @@ def get_recipe_image(recipe_id: int):
 @flask_app.route("/api/recipe/<int:recipe_id>/thumbnail", methods=["GET"])
 def get_recipe_thumbnail(recipe_id: int):
     """
-    Get the thumbnail image for a specific recipe.
+    Get the thumbnail image for a specific recipe (page 1).
     Returns the thumbnail data as PNG.
     """
     if db_engine is None:
@@ -416,12 +499,20 @@ def get_recipe_thumbnail(recipe_id: int):
             if not recipe:
                 return jsonify({"error": "Recipe not found"}), 404
 
-            if not recipe.thumbnail_data:
-                return jsonify({"error": "No thumbnail available"}), 404
+            # Get page 1 image (pdf_page_number = 0)
+            recipe_image = (
+                session.query(RecipeImage)
+                .filter(RecipeImage.recipe_id == recipe_id)
+                .filter(RecipeImage.pdf_page_number == 0)
+                .first()
+            )
+
+            if not recipe_image or not recipe_image.thumbnail_data:
+                return jsonify({"error": "No thumbnail available for page 1"}), 404
 
             # Return thumbnail as PNG
             return Response(
-                recipe.thumbnail_data,
+                recipe_image.thumbnail_data,
                 mimetype="image/png",
                 headers={
                     "Content-Disposition": f"inline; filename=recipe_{recipe_id}_thumb.png"
@@ -435,7 +526,7 @@ def get_recipe_thumbnail(recipe_id: int):
 @flask_app.route("/api/recipe/<int:recipe_id>/medium", methods=["GET"])
 def get_recipe_medium(recipe_id: int):
     """
-    Get the medium-sized image for a specific recipe.
+    Get the medium-sized image for a specific recipe (page 1).
     Returns the medium image data as PNG.
     """
     if db_engine is None:
@@ -448,12 +539,20 @@ def get_recipe_medium(recipe_id: int):
             if not recipe:
                 return jsonify({"error": "Recipe not found"}), 404
 
-            if not recipe.medium_image_data:
-                return jsonify({"error": "No medium image available"}), 404
+            # Get page 1 image (pdf_page_number = 0)
+            recipe_image = (
+                session.query(RecipeImage)
+                .filter(RecipeImage.recipe_id == recipe_id)
+                .filter(RecipeImage.pdf_page_number == 0)
+                .first()
+            )
+
+            if not recipe_image or not recipe_image.medium_image_data:
+                return jsonify({"error": "No medium image available for page 1"}), 404
 
             # Return medium image as PNG
             return Response(
-                recipe.medium_image_data,
+                recipe_image.medium_image_data,
                 mimetype="image/png",
                 headers={
                     "Content-Disposition": f"inline; filename=recipe_{recipe_id}_medium.png"
@@ -467,7 +566,7 @@ def get_recipe_medium(recipe_id: int):
 @flask_app.route("/api/recipe/<int:recipe_id>/rotation", methods=["POST"])
 def update_recipe_rotation(recipe_id: int):
     """
-    Update the rotation value for a specific recipe.
+    Update the rotation value for a specific recipe (page 1 image).
     Expects JSON: {"rotation": 0|90|180|270}
     """
     if db_engine is None:
@@ -488,8 +587,19 @@ def update_recipe_rotation(recipe_id: int):
             if not recipe:
                 return jsonify({"error": "Recipe not found"}), 404
 
-            recipe.rotation = rotation
-            session.add(recipe)
+            # Get page 1 image (pdf_page_number = 0)
+            recipe_image = (
+                session.query(RecipeImage)
+                .filter(RecipeImage.recipe_id == recipe_id)
+                .filter(RecipeImage.pdf_page_number == 0)
+                .first()
+            )
+
+            if not recipe_image:
+                return jsonify({"error": "No image found for page 1"}), 404
+
+            recipe_image.rotation = rotation
+            session.add(recipe_image)
             session.commit()
 
             return jsonify({"success": True, "rotation": rotation})

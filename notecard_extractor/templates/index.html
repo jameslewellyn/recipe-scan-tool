@@ -390,6 +390,28 @@
             text-align: center;
         }
 
+        .image-column {
+            width: 80px;
+            text-align: center;
+        }
+
+        .edit-column {
+            width: 80px;
+            text-align: center;
+        }
+
+        .edit-icon {
+            cursor: pointer;
+            font-size: 1.2em;
+            color: #667eea;
+            transition: transform 0.2s, color 0.2s;
+        }
+
+        .edit-icon:hover {
+            transform: scale(1.2);
+            color: #764ba2;
+        }
+
         .thumbnail-column {
             width: 120px;
             text-align: center;
@@ -576,7 +598,6 @@
         <div class="tabs">
             <div class="tab" data-tab="upload">📤 Upload</div>
             <div class="tab active" data-tab="view">🔍 View</div>
-            <div class="tab" data-tab="edit">✏️ Edit</div>
         </div>
 
         <!-- Upload Tab -->
@@ -630,19 +651,11 @@
             </div>
         </div>
 
-        <!-- Edit Tab -->
-        <div id="edit-tab" class="tab-content">
-            <div class="empty-state">
-                <div class="empty-state-icon">✏️</div>
-                <p>Edit functionality coming soon...</p>
-            </div>
-        </div>
-
         <!-- View Tab -->
         <div id="view-tab" class="tab-content active">
             <div class="files-header">
-                <h2>Uploaded PDFs</h2>
-                <div id="recipeCount" class="file-count" style="display: none;">0 PDFs</div>
+                <h2>Uploaded Recipes</h2>
+                <div id="recipeCount" class="file-count" style="display: none;">0 Recipes</div>
             </div>
 
             <div id="viewLoading" class="loading" style="display: none;">
@@ -658,10 +671,11 @@
                             <th class="count-column">#</th>
                             <th class="thumbnail-column">Thumbnail</th>
                             <th class="timestamp-column">Upload Date/Time</th>
-                            <th class="filename-column">PDF Name</th>
+                            <th class="filename-column">Recipe Name</th>
                             <th class="state-column">State</th>
                             <th class="expand-column">Expand</th>
                             <th class="image-column">Image</th>
+                            <th class="edit-column">Edit</th>
                         </tr>
                     </thead>
                     <tbody id="recipesTableBody">
@@ -672,7 +686,7 @@
 
             <div id="viewEmptyState" class="empty-state">
                 <div class="empty-state-icon">📄</div>
-                <p>No PDFs uploaded yet. Use the Upload tab to add PDFs to the database.</p>
+                <p>No recipes uploaded yet. Use the Upload tab to add recipes to the database.</p>
             </div>
         </div>
 
@@ -1000,7 +1014,7 @@
                 return;
             }
 
-            recipeCount.textContent = `${recipes.length} PDF${recipes.length !== 1 ? 's' : ''}`;
+            recipeCount.textContent = `${recipes.length} Recipe${recipes.length !== 1 ? 's' : ''}`;
             recipeCount.style.display = 'block';
 
             recipesTableBody.innerHTML = '';
@@ -1025,6 +1039,11 @@
                 // Expand icon
                 const expandIcon = `<span class="expand-icon" data-recipe-id="${recipe.id}" title="Expand row">➕</span>`;
                 
+                // Edit icon
+                const editIcon = recipe.id
+                    ? `<span class="edit-icon" data-recipe-id="${recipe.id}" title="Edit recipe">✏️</span>`
+                    : '<span style="color: #ccc;">—</span>';
+                
                 row.innerHTML = `
                     <td class="count-column">${recipe.count}</td>
                     <td class="thumbnail-column">${thumbnail}</td>
@@ -1033,6 +1052,7 @@
                     <td class="state-column">${stateBadge}</td>
                     <td class="expand-column">${expandIcon}</td>
                     <td class="image-column">${previewIcon}</td>
+                    <td class="edit-column">${editIcon}</td>
                 `;
                 recipesTableBody.appendChild(row);
 
@@ -1041,15 +1061,15 @@
                 expandRow.className = 'expandable-row-content';
                 expandRow.setAttribute('data-recipe-id', recipe.id || '');
                 const expandCell = document.createElement('td');
-                expandCell.colSpan = 7; // Count, Thumbnail, Timestamp, Filename, State, Expand, Image
+                expandCell.colSpan = 8; // Count, Thumbnail, Timestamp, Filename, State, Expand, Image, Edit
                 expandCell.innerHTML = '<div class="detail-grid"><div class="detail-label">Loading...</div><div class="detail-value"></div></div>';
                 expandRow.appendChild(expandCell);
                 recipesTableBody.appendChild(expandRow);
 
-                // Add click handler to main row (but not to preview icon or thumbnail)
+                // Add click handler to main row (but not to preview icon, thumbnail, or edit icon)
                 row.addEventListener('click', function(e) {
-                    // Don't expand if clicking on preview icon or thumbnail
-                    if (e.target.closest('.preview-icon') || e.target.closest('.thumbnail-img')) {
+                    // Don't expand if clicking on preview icon, thumbnail, or edit icon
+                    if (e.target.closest('.preview-icon') || e.target.closest('.thumbnail-img') || e.target.closest('.edit-icon')) {
                         return;
                     }
                     toggleRowExpansion(recipe.id);
@@ -1063,9 +1083,19 @@
                         toggleRowExpansion(recipe.id);
                     });
                 }
+
+                // Add click handler to edit icon
+                const editIconElement = row.querySelector('.edit-icon');
+                if (editIconElement) {
+                    editIconElement.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        // Edit functionality will be added later
+                        console.log('Edit recipe:', recipe.id);
+                    });
+                }
             });
 
-            // Add click handlers for thumbnails
+            // Add click handlers and error handlers for thumbnails
             document.querySelectorAll('.thumbnail-img').forEach(thumbnail => {
                 thumbnail.addEventListener('click', function(e) {
                     e.stopPropagation();
@@ -1073,6 +1103,14 @@
                     if (recipeId) {
                         showImagePreview(recipeId);
                     }
+                });
+                thumbnail.addEventListener('error', function() {
+                    const recipeId = this.getAttribute('data-recipe-id');
+                    console.error('Failed to load thumbnail for recipe', recipeId);
+                    this.onerror = null;
+                    this.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dominant-baseline="middle" fill="%23ccc"%3ENo Image%3C/text%3E%3C/svg%3E';
+                    this.style.cursor = 'default';
+                    this.title = 'No thumbnail available';
                 });
             });
 
@@ -1157,24 +1195,26 @@
             if (detailGrid && detailGrid.innerHTML.includes('Loading...')) {
                 try {
                     const response = await fetch(`/api/recipe/${recipeId}`);
-                    const data = await response.json();
-
+                    
                     if (!response.ok) {
-                        throw new Error(data.error || 'Failed to load recipe details');
+                        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+                        throw new Error(errorData.error || 'Failed to load recipe details');
                     }
+                    
+                    const data = await response.json();
 
                     // Format the details
                     detailGrid.innerHTML = `
-                        <div class="detail-label">PDF Filename:</div>
+                        <div class="detail-label">Recipe Filename:</div>
                         <div class="detail-value">${escapeHtml(data.pdf_filename || 'N/A')}</div>
                         
                         <div class="detail-label">Upload Timestamp:</div>
                         <div class="detail-value">${formatTimestamp(data.pdf_upload_timestamp)}</div>
                         
-                        <div class="detail-label">Original PDF SHA256:</div>
+                        <div class="detail-label">Original Recipe SHA256:</div>
                         <div class="detail-value">${data.original_pdf_sha256 || '<span class="empty">Not available</span>'}</div>
                         
-                        <div class="detail-label">Original PDF Size:</div>
+                        <div class="detail-label">Original Recipe Size:</div>
                         <div class="detail-value">${formatFileSize(data.original_pdf_size)}</div>
                         
                         <div class="detail-label">Cropped Image SHA256:</div>
@@ -1236,11 +1276,43 @@
                         
                         <div class="detail-label">Dish Picture 4 Size:</div>
                         <div class="detail-value">${formatFileSize(data.dish_picture_4_size)}</div>
+                        
+                        <div class="detail-label">Total Pages:</div>
+                        <div class="detail-value">${data.total_pages || 0}</div>
                     `;
+                    
+                    // Add pages section if pages exist
+                    if (data.pages && data.pages.length > 0) {
+                        let pagesHtml = '<div class="detail-label" style="grid-column: 1 / -1; margin-top: 20px; font-weight: bold; border-top: 2px solid #e0e0e0; padding-top: 15px;">PDF Pages:</div>';
+                        data.pages.forEach((page, index) => {
+                            const pageNum = page.pdf_page_number + 1; // Convert 0-indexed to 1-indexed for display
+                            pagesHtml += `
+                                <div class="detail-label" style="grid-column: 1 / -1; margin-top: 10px; font-weight: 600; color: #667eea;">Page ${pageNum}:</div>
+                                <div class="detail-label">Page ${pageNum} - Rotation:</div>
+                                <div class="detail-value">${page.rotation}°</div>
+                                <div class="detail-label">Page ${pageNum} - Cropped Image SHA256:</div>
+                                <div class="detail-value">${page.cropped_image_sha256 || '<span class="empty">Not available</span>'}</div>
+                                <div class="detail-label">Page ${pageNum} - Cropped Image Size:</div>
+                                <div class="detail-value">${formatFileSize(page.cropped_image_size)}</div>
+                                <div class="detail-label">Page ${pageNum} - Medium Image SHA256:</div>
+                                <div class="detail-value">${page.medium_image_sha256 || '<span class="empty">Not available</span>'}</div>
+                                <div class="detail-label">Page ${pageNum} - Medium Image Size:</div>
+                                <div class="detail-value">${formatFileSize(page.medium_image_size)}</div>
+                                <div class="detail-label">Page ${pageNum} - Thumbnail SHA256:</div>
+                                <div class="detail-value">${page.thumbnail_sha256 || '<span class="empty">Not available</span>'}</div>
+                                <div class="detail-label">Page ${pageNum} - Thumbnail Size:</div>
+                                <div class="detail-value">${formatFileSize(page.thumbnail_size)}</div>
+                            `;
+                        });
+                        detailGrid.innerHTML += pagesHtml;
+                    }
                 } catch (error) {
+                    console.error('Error loading recipe details:', error);
                     detailGrid.innerHTML = `
                         <div class="detail-label">Error:</div>
                         <div class="detail-value" style="color: #c33;">${escapeHtml(error.message)}</div>
+                        <div class="detail-label">Note:</div>
+                        <div class="detail-value">This recipe may not have RecipeImage entries. Try re-uploading the PDF.</div>
                     `;
                 }
             }
@@ -1282,6 +1354,11 @@
                     
                     // Use full image for detailed preview
                     const imageUrl = `/api/recipe/${recipeIdNum}/image`;
+                    previewImage.onerror = function() {
+                        this.onerror = null;
+                        this.src = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'400\' height=\'400\'%3E%3Ctext x=\'50%25\' y=\'50%25\' text-anchor=\'middle\' dominant-baseline=\'middle\' fill=\'%23ccc\' font-size=\'20\'%3ENo Image Available%3C/text%3E%3C/svg%3E';
+                        console.error('Failed to load image for recipe', recipeIdNum);
+                    };
                     previewImage.src = imageUrl;
                     imageOverlay.classList.add('active');
                 })
@@ -1293,6 +1370,11 @@
                     
                     // Use full image for detailed preview
                     const imageUrl = `/api/recipe/${recipeIdNum}/image`;
+                    previewImage.onerror = function() {
+                        this.onerror = null;
+                        this.src = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'400\' height=\'400\'%3E%3Ctext x=\'50%25\' y=\'50%25\' text-anchor=\'middle\' dominant-baseline=\'middle\' fill=\'%23ccc\' font-size=\'20\'%3ENo Image Available%3C/text%3E%3C/svg%3E';
+                        console.error('Failed to load image for recipe', recipeIdNum);
+                    };
                     previewImage.src = imageUrl;
                     imageOverlay.classList.add('active');
                 });

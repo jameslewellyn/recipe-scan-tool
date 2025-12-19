@@ -22,7 +22,8 @@ def extract_notecards(
     ),
 ):
     """
-    Extract a single image from each PDF file in the input folder.
+    Extract images from each page of each PDF file in the input folder.
+    Each page's image is saved as a separate file with _page# before the suffix.
     Images are saved to the specified output folder, or to '{input_folder}_images' if not provided.
     """
     # Validate input folder
@@ -57,10 +58,9 @@ def extract_notecards(
             reader = PdfReader(pdf_file)
             images_found = False
 
-            # Iterate through pages to find the first image
+            # Iterate through pages to extract one image per page
             for page_num, page in enumerate(reader.pages):
-                if images_found:
-                    break
+                page_image_found = False
 
                 # Extract images from the page
                 for image_index, image_file_object in enumerate(page.images):
@@ -88,12 +88,17 @@ def extract_notecards(
                         # Open image with PIL
                         image = Image.open(io.BytesIO(image_data))
 
-                        # Save the first image found
-                        output_path = output_folder / f"{pdf_file.stem}{ext}"
+                        # Save image with _page# before the suffix
+                        output_path = (
+                            output_folder / f"{pdf_file.stem}_page{page_num}{ext}"
+                        )
                         image.save(output_path)
-                        typer.echo(f"  ✓ Extracted image: {output_path.name}")
+                        typer.echo(
+                            f"  ✓ Extracted image from page {page_num + 1}: {output_path.name}"
+                        )
                         images_found = True
-                        break
+                        page_image_found = True
+                        break  # Only extract the first image from each page
 
                     except Exception as e:
                         typer.echo(
@@ -101,6 +106,12 @@ def extract_notecards(
                             err=True,
                         )
                         continue
+
+                if not page_image_found:
+                    typer.echo(
+                        f"  ⚠ No image found on page {page_num + 1} of '{pdf_file.name}'",
+                        err=True,
+                    )
 
             if not images_found:
                 typer.echo(f"  ⚠ No images found in '{pdf_file.name}'", err=True)
