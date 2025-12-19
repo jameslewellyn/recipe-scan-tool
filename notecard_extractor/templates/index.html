@@ -305,6 +305,60 @@
             border-top: 1px solid #e0e0e0;
         }
 
+        .sub-expandable-section {
+            margin-top: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+            background: white;
+            display: block;
+            width: 100%;
+            grid-column: 1 / -1;
+        }
+
+        .sub-expandable-header {
+            padding: 12px 15px;
+            background: #f5f5f5;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-radius: 5px 5px 0 0;
+            transition: background 0.2s;
+        }
+
+        .sub-expandable-header:hover {
+            background: #eeeeee;
+        }
+
+        .sub-expandable-header.expanded {
+            border-radius: 5px 5px 0 0;
+        }
+
+        .sub-expandable-icon {
+            font-size: 1.2em;
+            transition: transform 0.2s;
+        }
+
+        .sub-expandable-header.expanded .sub-expandable-icon {
+            transform: rotate(90deg);
+        }
+
+        .sub-expandable-content {
+            display: none;
+            padding: 15px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .sub-expandable-content.expanded {
+            display: block;
+        }
+
+        .sub-expandable-grid {
+            display: grid;
+            grid-template-columns: 200px 1fr;
+            gap: 10px 15px;
+        }
+
         .detail-grid {
             display: grid;
             grid-template-columns: 200px 1fr;
@@ -420,11 +474,21 @@
         .thumbnail-img {
             max-width: 100px;
             max-height: 100px;
+            width: auto;
+            height: auto;
+            object-fit: contain;
             border-radius: 4px;
             border: 1px solid #e0e0e0;
             cursor: pointer;
             transition: transform 0.2s, box-shadow 0.2s;
             transform-origin: center center;
+        }
+        
+        .thumbnail-column {
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .thumbnail-img:hover {
@@ -456,39 +520,54 @@
             height: 100%;
             background: rgba(0, 0, 0, 0.9);
             z-index: 1000;
-            justify-content: center;
-            align-items: center;
             cursor: pointer;
+            overflow-y: auto;
+            overflow-x: hidden;
         }
 
         .image-overlay.active {
-            display: flex;
+            display: block;
         }
 
         .image-overlay-content {
-            max-width: 90%;
-            max-height: 90%;
-            position: relative;
+            min-height: 100%;
             display: flex;
             flex-direction: column;
             align-items: center;
+            justify-content: space-between;
+            padding: 60px 20px 30px 20px;
+            box-sizing: border-box;
         }
 
         .image-overlay-content img {
-            max-width: 100%;
-            max-height: 80vh;
+            max-width: min(95vw, calc(100vh - 150px));
+            max-height: calc(100vh - 150px);
+            width: auto;
+            height: auto;
+            object-fit: contain;
             border: 3px solid white;
             border-radius: 8px;
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
             transition: transform 0.3s ease;
             transform-origin: center center;
+            flex-shrink: 0;
+            display: block;
+            margin: auto;
         }
 
         .rotation-controls {
-            margin-top: 20px;
             display: flex;
             gap: 20px;
             align-items: center;
+            flex-shrink: 0;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px 20px;
+            border-radius: 10px;
+            width: fit-content;
+            position: relative;
+            z-index: 10;
+            margin-top: auto;
+            margin-bottom: 20px;
         }
 
         .rotation-button {
@@ -525,9 +604,9 @@
         }
 
         .image-overlay-close {
-            position: absolute;
-            top: -40px;
-            right: 0;
+            position: fixed;
+            top: 20px;
+            right: 20px;
             color: white;
             font-size: 2em;
             cursor: pointer;
@@ -539,6 +618,7 @@
             align-items: center;
             justify-content: center;
             transition: background 0.2s;
+            z-index: 1001;
         }
 
         .image-overlay-close:hover {
@@ -1028,7 +1108,7 @@
                     : '<span style="color: #ccc;">—</span>';
                 const rotation = recipe.rotation !== undefined ? recipe.rotation : 0;
                 const thumbnail = recipe.id
-                    ? `<img src="/api/recipe/${recipe.id}/thumbnail" alt="Thumbnail" class="thumbnail-img" data-recipe-id="${recipe.id}" data-rotation="${rotation}" style="transform: rotate(${rotation}deg);" title="Click to preview">`
+                    ? `<div style="width: 100px; height: 100px; display: flex; align-items: center; justify-content: center; overflow: hidden; margin: 0 auto;"><img src="/api/recipe/${recipe.id}/thumbnail" alt="Thumbnail" class="thumbnail-img" data-recipe-id="${recipe.id}" data-rotation="${rotation}" style="max-width: 100px; max-height: 100px; width: auto; height: auto; object-fit: contain; transform: rotate(${rotation}deg);" title="Click to preview"></div>`
                     : '<span style="color: #ccc;">—</span>';
                 
                 // Format state with emoji and badge
@@ -1211,32 +1291,11 @@
                         <div class="detail-label">Upload Timestamp:</div>
                         <div class="detail-value">${formatTimestamp(data.pdf_upload_timestamp)}</div>
                         
-                        <div class="detail-label">Original Recipe SHA256:</div>
+                        <div class="detail-label">Original PDF SHA256:</div>
                         <div class="detail-value">${data.original_pdf_sha256 || '<span class="empty">Not available</span>'}</div>
                         
-                        <div class="detail-label">Original Recipe Size:</div>
+                        <div class="detail-label">Original PDF Size:</div>
                         <div class="detail-value">${formatFileSize(data.original_pdf_size)}</div>
-                        
-                        <div class="detail-label">Cropped Image SHA256:</div>
-                        <div class="detail-value">${data.cropped_image_sha256 || '<span class="empty">Not available</span>'}</div>
-                        
-                        <div class="detail-label">Cropped Image Size:</div>
-                        <div class="detail-value">${formatFileSize(data.cropped_image_size)}</div>
-                        
-                        <div class="detail-label">Medium Image SHA256:</div>
-                        <div class="detail-value">${data.medium_image_sha256 || '<span class="empty">Not available</span>'}</div>
-                        
-                        <div class="detail-label">Medium Image Size:</div>
-                        <div class="detail-value">${formatFileSize(data.medium_image_size)}</div>
-                        
-                        <div class="detail-label">Thumbnail SHA256:</div>
-                        <div class="detail-value">${data.thumbnail_sha256 || '<span class="empty">Not available</span>'}</div>
-                        
-                        <div class="detail-label">Thumbnail Size:</div>
-                        <div class="detail-value">${formatFileSize(data.thumbnail_size)}</div>
-                        
-                        <div class="detail-label">Rotation:</div>
-                        <div class="detail-value">${data.rotation}°</div>
                         
                         <div class="detail-label">State:</div>
                         <div class="detail-value">${data.state || '<span class="empty">Not set</span>'}</div>
@@ -1265,47 +1324,152 @@
                         <div class="detail-label">Notes:</div>
                         <div class="detail-value">${data.notes ? escapeHtml(data.notes) : '<span class="empty">Not set</span>'}</div>
                         
-                        <div class="detail-label">Dish Picture 1 Size:</div>
-                        <div class="detail-value">${formatFileSize(data.dish_picture_1_size)}</div>
-                        
-                        <div class="detail-label">Dish Picture 2 Size:</div>
-                        <div class="detail-value">${formatFileSize(data.dish_picture_2_size)}</div>
-                        
-                        <div class="detail-label">Dish Picture 3 Size:</div>
-                        <div class="detail-value">${formatFileSize(data.dish_picture_3_size)}</div>
-                        
-                        <div class="detail-label">Dish Picture 4 Size:</div>
-                        <div class="detail-value">${formatFileSize(data.dish_picture_4_size)}</div>
-                        
                         <div class="detail-label">Total Pages:</div>
                         <div class="detail-value">${data.total_pages || 0}</div>
+                        
+                        <div class="detail-label">Total Dish Images:</div>
+                        <div class="detail-value">${data.total_dish_images || 0}</div>
                     `;
                     
-                    // Add pages section if pages exist
-                    if (data.pages && data.pages.length > 0) {
-                        let pagesHtml = '<div class="detail-label" style="grid-column: 1 / -1; margin-top: 20px; font-weight: bold; border-top: 2px solid #e0e0e0; padding-top: 15px;">PDF Pages:</div>';
-                        data.pages.forEach((page, index) => {
+                    // Add sub-expandable section for recipe images (PDF pages)
+                    if (data.pages !== undefined) {
+                        const pageCount = data.pages ? data.pages.length : 0;
+                        let pagesHtml = `
+                            <div class="sub-expandable-section">
+                                <div class="sub-expandable-header" data-section="recipe-images-${recipeId}">
+                                    <span style="font-weight: 600; color: #667eea;">📄 Recipe Images (PDF Pages) - ${pageCount} page(s)</span>
+                                    <span class="sub-expandable-icon">▶</span>
+                                </div>
+                                <div class="sub-expandable-content" id="recipe-images-${recipeId}">
+                                    <div class="sub-expandable-grid">
+                        `;
+                        if (pageCount === 0) {
+                            pagesHtml += `
+                                <div class="detail-label" style="grid-column: 1 / -1; color: #999; font-style: italic;">No recipe images available</div>
+                            `;
+                        } else {
+                            data.pages.forEach((page, index) => {
                             const pageNum = page.pdf_page_number + 1; // Convert 0-indexed to 1-indexed for display
                             pagesHtml += `
-                                <div class="detail-label" style="grid-column: 1 / -1; margin-top: 10px; font-weight: 600; color: #667eea;">Page ${pageNum}:</div>
-                                <div class="detail-label">Page ${pageNum} - Rotation:</div>
+                                <div class="detail-label" style="grid-column: 1 / -1; margin-top: ${index > 0 ? '15px' : '0'}; font-weight: 600; color: #667eea; border-top: ${index > 0 ? '1px solid #e0e0e0' : 'none'}; padding-top: ${index > 0 ? '10px' : '0'}; display: flex; align-items: center; gap: 15px;">
+                                    <span>Page ${pageNum}:</span>
+                                    <div style="width: 100px; height: 100px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                                        <img src="/api/recipe/${recipeId}/page/${page.pdf_page_number}/thumbnail" alt="Page ${pageNum} thumbnail" class="thumbnail-clickable" data-recipe-id="${recipeId}" data-image-type="page" data-page-number="${page.pdf_page_number}" style="max-width: 100px; max-height: 100px; width: auto; height: auto; object-fit: contain; border-radius: 4px; border: 1px solid #e0e0e0; transform: rotate(${page.rotation}deg); cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;" onerror="this.style.display='none';" onmouseover="this.style.boxShadow='0 4px 8px rgba(0,0,0,0.2)';" onmouseout="this.style.boxShadow='';">
+                                    </div>
+                                </div>
+                                <div class="detail-label">Rotation:</div>
                                 <div class="detail-value">${page.rotation}°</div>
-                                <div class="detail-label">Page ${pageNum} - Cropped Image SHA256:</div>
+                                <div class="detail-label">Cropped Image SHA256:</div>
                                 <div class="detail-value">${page.cropped_image_sha256 || '<span class="empty">Not available</span>'}</div>
-                                <div class="detail-label">Page ${pageNum} - Cropped Image Size:</div>
+                                <div class="detail-label">Cropped Image Size:</div>
                                 <div class="detail-value">${formatFileSize(page.cropped_image_size)}</div>
-                                <div class="detail-label">Page ${pageNum} - Medium Image SHA256:</div>
+                                <div class="detail-label">Medium Image SHA256:</div>
                                 <div class="detail-value">${page.medium_image_sha256 || '<span class="empty">Not available</span>'}</div>
-                                <div class="detail-label">Page ${pageNum} - Medium Image Size:</div>
+                                <div class="detail-label">Medium Image Size:</div>
                                 <div class="detail-value">${formatFileSize(page.medium_image_size)}</div>
-                                <div class="detail-label">Page ${pageNum} - Thumbnail SHA256:</div>
+                                <div class="detail-label">Thumbnail SHA256:</div>
                                 <div class="detail-value">${page.thumbnail_sha256 || '<span class="empty">Not available</span>'}</div>
-                                <div class="detail-label">Page ${pageNum} - Thumbnail Size:</div>
+                                <div class="detail-label">Thumbnail Size:</div>
                                 <div class="detail-value">${formatFileSize(page.thumbnail_size)}</div>
                             `;
-                        });
+                            });
+                        }
+                        pagesHtml += `
+                                    </div>
+                                </div>
+                            </div>
+                        `;
                         detailGrid.innerHTML += pagesHtml;
                     }
+                    
+                    // Add sub-expandable section for dish images
+                    if (data.dish_images !== undefined) {
+                        const dishImageCount = data.dish_images ? data.dish_images.length : 0;
+                        let dishImagesHtml = `
+                            <div class="sub-expandable-section">
+                                <div class="sub-expandable-header" data-section="dish-images-${recipeId}">
+                                    <span style="font-weight: 600; color: #667eea;">🍽️ Dish Images - ${dishImageCount} image(s)</span>
+                                    <span class="sub-expandable-icon">▶</span>
+                                </div>
+                                <div class="sub-expandable-content" id="dish-images-${recipeId}">
+                                    <div class="sub-expandable-grid">
+                        `;
+                        if (dishImageCount === 0) {
+                            dishImagesHtml += `
+                                <div class="detail-label" style="grid-column: 1 / -1; color: #999; font-style: italic;">No dish images available</div>
+                            `;
+                        } else {
+                            data.dish_images.forEach((dishImg, index) => {
+                            dishImagesHtml += `
+                                <div class="detail-label" style="grid-column: 1 / -1; margin-top: ${index > 0 ? '15px' : '0'}; font-weight: 600; color: #667eea; border-top: ${index > 0 ? '1px solid #e0e0e0' : 'none'}; padding-top: ${index > 0 ? '10px' : '0'}; display: flex; align-items: center; gap: 15px;">
+                                    <span>Dish Image ${dishImg.image_number}:</span>
+                                    <div style="width: 100px; height: 100px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                                        <img src="/api/recipe/${recipeId}/dish/${dishImg.image_number}/thumbnail" alt="Dish Image ${dishImg.image_number} thumbnail" class="thumbnail-clickable" data-recipe-id="${recipeId}" data-image-type="dish" data-dish-number="${dishImg.image_number}" style="max-width: 100px; max-height: 100px; width: auto; height: auto; object-fit: contain; border-radius: 4px; border: 1px solid #e0e0e0; transform: rotate(${dishImg.rotation}deg); cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;" onerror="this.style.display='none';" onmouseover="this.style.boxShadow='0 4px 8px rgba(0,0,0,0.2)';" onmouseout="this.style.boxShadow='';">
+                                    </div>
+                                </div>
+                                <div class="detail-label">Rotation:</div>
+                                <div class="detail-value">${dishImg.rotation}°</div>
+                                <div class="detail-label">Image SHA256:</div>
+                                <div class="detail-value">${dishImg.image_sha256 || '<span class="empty">Not available</span>'}</div>
+                                <div class="detail-label">Image Size:</div>
+                                <div class="detail-value">${formatFileSize(dishImg.image_size)}</div>
+                                <div class="detail-label">Medium Image SHA256:</div>
+                                <div class="detail-value">${dishImg.medium_image_sha256 || '<span class="empty">Not available</span>'}</div>
+                                <div class="detail-label">Medium Image Size:</div>
+                                <div class="detail-value">${formatFileSize(dishImg.medium_image_size)}</div>
+                                <div class="detail-label">Thumbnail SHA256:</div>
+                                <div class="detail-value">${dishImg.thumbnail_sha256 || '<span class="empty">Not available</span>'}</div>
+                                <div class="detail-label">Thumbnail Size:</div>
+                                <div class="detail-value">${formatFileSize(dishImg.thumbnail_size)}</div>
+                            `;
+                            });
+                        }
+                        dishImagesHtml += `
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        detailGrid.innerHTML += dishImagesHtml;
+                    }
+                    
+                    // Add click handlers for sub-expandable sections
+                    detailGrid.querySelectorAll('.sub-expandable-header').forEach(header => {
+                        header.addEventListener('click', function() {
+                            const sectionId = this.getAttribute('data-section');
+                            const content = document.getElementById(sectionId);
+                            if (content) {
+                                const isExpanded = content.classList.contains('expanded');
+                                if (isExpanded) {
+                                    content.classList.remove('expanded');
+                                    this.classList.remove('expanded');
+                                } else {
+                                    content.classList.add('expanded');
+                                    this.classList.add('expanded');
+                                }
+                            }
+                        });
+                    });
+                    
+                    // Add click handlers for thumbnail images
+                    detailGrid.querySelectorAll('.thumbnail-clickable').forEach(thumbnail => {
+                        thumbnail.addEventListener('click', function(e) {
+                            e.stopPropagation();
+                            const recipeId = this.getAttribute('data-recipe-id');
+                            const imageType = this.getAttribute('data-image-type');
+                            const pageNumber = this.getAttribute('data-page-number');
+                            const dishNumber = this.getAttribute('data-dish-number');
+                            
+                            if (recipeId) {
+                                if (imageType === 'page' && pageNumber !== null) {
+                                    showImagePreview(recipeId, 'page', parseInt(pageNumber, 10));
+                                } else if (imageType === 'dish' && dishNumber !== null) {
+                                    showImagePreview(recipeId, 'dish', null, parseInt(dishNumber, 10));
+                                } else {
+                                    showImagePreview(recipeId);
+                                }
+                            }
+                        });
+                    });
                 } catch (error) {
                     console.error('Error loading recipe details:', error);
                     detailGrid.innerHTML = `
@@ -1328,56 +1492,83 @@
         
         let currentRecipeId = null;
         let currentRotation = 0;
+        let currentImageType = null; // 'recipe', 'page', or 'dish'
+        let currentPageNumber = null;
+        let currentDishNumber = null;
 
-        function showImagePreview(recipeId) {
+        function showImagePreview(recipeId, imageType = 'recipe', pageNumber = null, dishNumber = null) {
             // Convert recipeId to number for comparison
             const recipeIdNum = parseInt(recipeId, 10);
             currentRecipeId = recipeIdNum;
+            currentImageType = imageType;
+            currentPageNumber = pageNumber;
+            currentDishNumber = dishNumber;
             
             // Reset rotation display while loading
             rotationDisplay.textContent = 'Loading...';
             
-            // Get current rotation from the recipe data first, then show image
-            fetch(`/api/recipes`)
-                .then(response => response.json())
-                .then(data => {
-                    const recipe = data.recipes.find(r => r.id === recipeIdNum);
-                    if (recipe && recipe.rotation !== undefined && recipe.rotation !== null) {
-                        currentRotation = parseInt(recipe.rotation, 10) || 0;
-                    } else {
-                        currentRotation = 0;
-                    }
-                    
-                    // Apply rotation before showing image
-                    updateRotationDisplay();
-                    updateImageRotation();
-                    
-                    // Use full image for detailed preview
-                    const imageUrl = `/api/recipe/${recipeIdNum}/image`;
-                    previewImage.onerror = function() {
-                        this.onerror = null;
-                        this.src = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'400\' height=\'400\'%3E%3Ctext x=\'50%25\' y=\'50%25\' text-anchor=\'middle\' dominant-baseline=\'middle\' fill=\'%23ccc\' font-size=\'20\'%3ENo Image Available%3C/text%3E%3C/svg%3E';
-                        console.error('Failed to load image for recipe', recipeIdNum);
-                    };
-                    previewImage.src = imageUrl;
-                    imageOverlay.classList.add('active');
-                })
-                .catch(err => {
-                    console.error('Error fetching rotation:', err);
-                    currentRotation = 0;
-                    updateRotationDisplay();
-                    updateImageRotation();
-                    
-                    // Use full image for detailed preview
-                    const imageUrl = `/api/recipe/${recipeIdNum}/image`;
-                    previewImage.onerror = function() {
-                        this.onerror = null;
-                        this.src = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'400\' height=\'400\'%3E%3Ctext x=\'50%25\' y=\'50%25\' text-anchor=\'middle\' dominant-baseline=\'middle\' fill=\'%23ccc\' font-size=\'20\'%3ENo Image Available%3C/text%3E%3C/svg%3E';
-                        console.error('Failed to load image for recipe', recipeIdNum);
-                    };
-                    previewImage.src = imageUrl;
-                    imageOverlay.classList.add('active');
-                });
+            // Determine image URL and rotation based on image type
+            let imageUrl;
+            let rotationPromise;
+            
+            if (imageType === 'page' && pageNumber !== null) {
+                imageUrl = `/api/recipe/${recipeIdNum}/page/${pageNumber}/image`;
+                // Fetch rotation from recipe details
+                rotationPromise = fetch(`/api/recipe/${recipeIdNum}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        const page = data.pages?.find(p => p.pdf_page_number === pageNumber);
+                        return page ? page.rotation : 0;
+                    })
+                    .catch(() => 0);
+            } else if (imageType === 'dish' && dishNumber !== null) {
+                imageUrl = `/api/recipe/${recipeIdNum}/dish/${dishNumber}/image`;
+                // Fetch rotation from recipe details
+                rotationPromise = fetch(`/api/recipe/${recipeIdNum}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        const dishImg = data.dish_images?.find(d => d.image_number === dishNumber);
+                        return dishImg ? dishImg.rotation : 0;
+                    })
+                    .catch(() => 0);
+            } else {
+                // Default to recipe page 1
+                imageUrl = `/api/recipe/${recipeIdNum}/image`;
+                rotationPromise = fetch(`/api/recipes`)
+                    .then(response => response.json())
+                    .then(data => {
+                        const recipe = data.recipes.find(r => r.id === recipeIdNum);
+                        return recipe && recipe.rotation !== undefined ? parseInt(recipe.rotation, 10) || 0 : 0;
+                    })
+                    .catch(() => 0);
+            }
+            
+            rotationPromise.then(rotation => {
+                currentRotation = rotation;
+                updateRotationDisplay();
+                updateImageRotation();
+                
+                previewImage.onerror = function() {
+                    this.onerror = null;
+                    this.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="400"%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dominant-baseline="middle" fill="%23ccc" font-size="20"%3ENo Image Available%3C/text%3E%3C/svg%3E';
+                    console.error('Failed to load image:', imageUrl);
+                };
+                previewImage.src = imageUrl;
+                imageOverlay.classList.add('active');
+            }).catch(err => {
+                console.error('Error fetching rotation:', err);
+                currentRotation = 0;
+                updateRotationDisplay();
+                updateImageRotation();
+                
+                previewImage.onerror = function() {
+                    this.onerror = null;
+                    this.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="400"%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dominant-baseline="middle" fill="%23ccc" font-size="20"%3ENo Image Available%3C/text%3E%3C/svg%3E';
+                    console.error('Failed to load image:', imageUrl);
+                };
+                previewImage.src = imageUrl;
+                imageOverlay.classList.add('active');
+            });
         }
 
         function updateRotationDisplay() {
@@ -1412,12 +1603,21 @@
             
             // Update database
             try {
+                const rotationData = { rotation: currentRotation };
+                if (currentImageType === 'page' && currentPageNumber !== null) {
+                    rotationData.image_type = 'page';
+                    rotationData.page_number = currentPageNumber;
+                } else if (currentImageType === 'dish' && currentDishNumber !== null) {
+                    rotationData.image_type = 'dish';
+                    rotationData.dish_number = currentDishNumber;
+                }
+                
                 const response = await fetch(`/api/recipe/${currentRecipeId}/rotation`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ rotation: currentRotation })
+                    body: JSON.stringify(rotationData)
                 });
                 
                 if (!response.ok) {
@@ -1459,6 +1659,9 @@
             previewImage.style.transformOrigin = 'center center';
             currentRecipeId = null;
             currentRotation = 0;
+            currentImageType = null;
+            currentPageNumber = null;
+            currentDishNumber = null;
         }
 
         // Close overlay when clicking close button, overlay background, or pressing Escape

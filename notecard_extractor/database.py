@@ -65,12 +65,6 @@ class Recipe(SQLModel, table=True):
     cook_time: Optional[str] = Field(default=None, max_length=100)
     notes: Optional[str] = Field(default=None)
 
-    # Dish pictures (4 fields)
-    dish_picture_1: Optional[bytes] = Field(default=None, sa_column=Column(LargeBinary))
-    dish_picture_2: Optional[bytes] = Field(default=None, sa_column=Column(LargeBinary))
-    dish_picture_3: Optional[bytes] = Field(default=None, sa_column=Column(LargeBinary))
-    dish_picture_4: Optional[bytes] = Field(default=None, sa_column=Column(LargeBinary))
-
 
 class RecipeImage(SQLModel, table=True):
     """
@@ -96,6 +90,38 @@ class RecipeImage(SQLModel, table=True):
         default=None, sa_column=Column(LargeBinary)
     )
     cropped_image_sha256: Optional[str] = Field(default=None, index=True, max_length=64)
+
+    # Medium and thumbnail versions
+    medium_image_data: Optional[bytes] = Field(
+        default=None, sa_column=Column(LargeBinary)
+    )
+    medium_image_sha256: Optional[str] = Field(default=None, index=True, max_length=64)
+    thumbnail_data: Optional[bytes] = Field(default=None, sa_column=Column(LargeBinary))
+    thumbnail_sha256: Optional[str] = Field(default=None, index=True, max_length=64)
+
+
+class DishImage(SQLModel, table=True):
+    """
+    DishImage table model.
+    Stores dish images associated with a Recipe.
+    Each recipe can have multiple dish images.
+    """
+
+    # Primary key
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    # Foreign key to Recipe
+    recipe_id: int = Field(foreign_key="recipe.id", index=True)
+
+    # Image number/position (1-indexed, for ordering)
+    image_number: int = Field(default=1, ge=1)
+
+    # Rotation (0, 90, 180, or 270 degrees)
+    rotation: int = Field(default=0, ge=0, le=270)
+
+    # Full image data
+    image_data: Optional[bytes] = Field(default=None, sa_column=Column(LargeBinary))
+    image_sha256: Optional[str] = Field(default=None, index=True, max_length=64)
 
     # Medium and thumbnail versions
     medium_image_data: Optional[bytes] = Field(

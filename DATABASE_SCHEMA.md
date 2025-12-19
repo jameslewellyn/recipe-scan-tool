@@ -22,10 +22,6 @@ Stores recipe data including original PDF and metadata. Each PDF upload creates 
 | `recipe`               | TEXT                  | Recipe instructions/steps                                                   |
 | `cook_time`            | VARCHAR(100)          | Cooking time                                                                |
 | `notes`                | TEXT                  | Additional notes                                                            |
-| `dish_picture_1`       | BLOB                  | First dish picture                                                          |
-| `dish_picture_2`       | BLOB                  | Second dish picture                                                         |
-| `dish_picture_3`       | BLOB                  | Third dish picture                                                          |
-| `dish_picture_4`       | BLOB                  | Fourth dish picture                                                         |
 
 ---
 
@@ -50,8 +46,30 @@ Stores images extracted from PDF pages. Each page of a PDF gets one RecipeImage 
 
 ---
 
+## Table 3: `dishimage`
+
+Stores dish images associated with recipes. Each recipe can have multiple dish images.
+
+### Columns:
+
+| Column Name           | Type                                       | Description                                     |
+| --------------------- | ------------------------------------------ | ----------------------------------------------- |
+| `id`                  | INTEGER (Primary Key)                      | Unique identifier for the dish image            |
+| `recipe_id`           | INTEGER (Foreign Key → recipe.id, Indexed) | Reference to the parent Recipe                  |
+| `image_number`        | INTEGER                                    | Image number/position (1-indexed, for ordering) |
+| `rotation`            | INTEGER                                    | Rotation angle (0, 90, 180, or 270 degrees)     |
+| `image_data`          | BLOB                                       | Full dish image data                            |
+| `image_sha256`        | VARCHAR(64) (Indexed)                      | SHA256 hash of the full image                   |
+| `medium_image_data`   | BLOB                                       | Medium-sized version of the image (max 800px)   |
+| `medium_image_sha256` | VARCHAR(64) (Indexed)                      | SHA256 hash of the medium image                 |
+| `thumbnail_data`      | BLOB                                       | Thumbnail version of the image (max 200px)      |
+| `thumbnail_sha256`    | VARCHAR(64) (Indexed)                      | SHA256 hash of the thumbnail                    |
+
+---
+
 ## Relationships
 
 -   **One-to-Many**: One `Recipe` can have multiple `RecipeImage` entries (one per PDF page)
+-   **One-to-Many**: One `Recipe` can have multiple `DishImage` entries
 -   The web GUI displays images from `RecipeImage` where `pdf_page_number = 0` (page 1) for each recipe
--   Rotation is stored per image in the `RecipeImage` table, allowing different rotations for different pages
+-   Rotation is stored per image in both `RecipeImage` and `DishImage` tables, allowing different rotations for different images

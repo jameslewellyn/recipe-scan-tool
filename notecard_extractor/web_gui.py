@@ -14,7 +14,7 @@ from datetime import datetime
 from pypdf import PdfReader
 from PIL import Image
 from sqlmodel import SQLModel, create_engine, Session
-from notecard_extractor.database import Recipe, RecipeState, RecipeImage
+from notecard_extractor.database import Recipe, RecipeState, RecipeImage, DishImage
 from notecard_extractor.image_processing import (
     autocrop_white_border,
     autocrop_grey_border,
@@ -356,6 +356,14 @@ def get_recipe(recipe_id: int):
                 .first()
             )
 
+            # Get all DishImage entries for this recipe
+            dish_images = (
+                session.query(DishImage)
+                .filter(DishImage.recipe_id == recipe_id)
+                .order_by(DishImage.image_number)
+                .all()
+            )
+
             # Build list of all pages
             pages = []
             for img in recipe_images:
@@ -367,6 +375,26 @@ def get_recipe(recipe_id: int):
                         "cropped_image_size": len(img.cropped_image_data)
                         if img.cropped_image_data
                         else 0,
+                        "medium_image_sha256": img.medium_image_sha256,
+                        "medium_image_size": len(img.medium_image_data)
+                        if img.medium_image_data
+                        else 0,
+                        "thumbnail_sha256": img.thumbnail_sha256,
+                        "thumbnail_size": len(img.thumbnail_data)
+                        if img.thumbnail_data
+                        else 0,
+                    }
+                )
+
+            # Build list of all dish images
+            dish_images_list = []
+            for img in dish_images:
+                dish_images_list.append(
+                    {
+                        "image_number": img.image_number,
+                        "rotation": img.rotation,
+                        "image_sha256": img.image_sha256,
+                        "image_size": len(img.image_data) if img.image_data else 0,
                         "medium_image_sha256": img.medium_image_sha256,
                         "medium_image_size": len(img.medium_image_data)
                         if img.medium_image_data
@@ -419,20 +447,10 @@ def get_recipe(recipe_id: int):
                 "recipe": recipe.recipe,
                 "cook_time": recipe.cook_time,
                 "notes": recipe.notes,
-                "dish_picture_1_size": len(recipe.dish_picture_1)
-                if recipe.dish_picture_1
-                else 0,
-                "dish_picture_2_size": len(recipe.dish_picture_2)
-                if recipe.dish_picture_2
-                else 0,
-                "dish_picture_3_size": len(recipe.dish_picture_3)
-                if recipe.dish_picture_3
-                else 0,
-                "dish_picture_4_size": len(recipe.dish_picture_4)
-                if recipe.dish_picture_4
-                else 0,
                 "pages": pages,
                 "total_pages": len(pages),
+                "dish_images": dish_images_list,
+                "total_dish_images": len(dish_images_list),
             }
 
             return jsonify(result)
@@ -563,11 +581,187 @@ def get_recipe_medium(recipe_id: int):
         return jsonify({"error": str(e)}), 500
 
 
+@flask_app.route(
+    "/api/recipe/<int:recipe_id>/page/<int:page_number>/thumbnail", methods=["GET"]
+)
+def get_recipe_page_thumbnail(recipe_id: int, page_number: int):
+    """
+    Get the thumbnail image for a specific recipe page.
+    Returns the thumbnail data as PNG.
+    """
+    if db_engine is None:
+        return jsonify({"error": "Database not initialized"}), 500
+
+    try:
+        with Session(db_engine) as session:
+            recipe = session.get(Recipe, recipe_id)
+
+            if not recipe:
+                return jsonify({"error": "Recipe not found"}), 404
+
+            # Get the specific page image (page_number is 0-indexed in URL, but stored as 0-indexed)
+            recipe_image = (
+                session.query(RecipeImage)
+                .filter(RecipeImage.recipe_id == recipe_id)
+                .filter(RecipeImage.pdf_page_number == page_number)
+                .first()
+            )
+
+            if not recipe_image or not recipe_image.thumbnail_data:
+                return jsonify(
+                    {"error": f"No thumbnail available for page {page_number + 1}"}
+                ), 404
+
+            # Return thumbnail as PNG
+            return Response(
+                recipe_image.thumbnail_data,
+                mimetype="image/png",
+                headers={
+                    "Content-Disposition": f"inline; filename=recipe_{recipe_id}_page{page_number}_thumb.png"
+                },
+            )
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@flask_app.route(
+    "/api/recipe/<int:recipe_id>/page/<int:page_number>/image", methods=["GET"]
+)
+def get_recipe_page_image(recipe_id: int, page_number: int):
+    """
+    Get the full cropped image for a specific recipe page.
+    Returns the cropped image data as PNG.
+    """
+    if db_engine is None:
+        return jsonify({"error": "Database not initialized"}), 500
+
+    try:
+        with Session(db_engine) as session:
+            recipe = session.get(Recipe, recipe_id)
+
+            if not recipe:
+                return jsonify({"error": "Recipe not found"}), 404
+
+            # Get the specific page image (page_number is 0-indexed)
+            recipe_image = (
+                session.query(RecipeImage)
+                .filter(RecipeImage.recipe_id == recipe_id)
+                .filter(RecipeImage.pdf_page_number == page_number)
+                .first()
+            )
+
+            if not recipe_image or not recipe_image.cropped_image_data:
+                return jsonify(
+                    {"error": f"No image available for page {page_number + 1}"}
+                ), 404
+
+            # Return image as PNG
+            return Response(
+                recipe_image.cropped_image_data,
+                mimetype="image/png",
+                headers={
+                    "Content-Disposition": f"inline; filename=recipe_{recipe_id}_page{page_number}.png"
+                },
+            )
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@flask_app.route(
+    "/api/recipe/<int:recipe_id>/dish/<int:image_number>/thumbnail", methods=["GET"]
+)
+def get_dish_image_thumbnail(recipe_id: int, image_number: int):
+    """
+    Get the thumbnail image for a specific dish image.
+    Returns the thumbnail data as PNG.
+    """
+    if db_engine is None:
+        return jsonify({"error": "Database not initialized"}), 500
+
+    try:
+        with Session(db_engine) as session:
+            recipe = session.get(Recipe, recipe_id)
+
+            if not recipe:
+                return jsonify({"error": "Recipe not found"}), 404
+
+            # Get the specific dish image
+            dish_image = (
+                session.query(DishImage)
+                .filter(DishImage.recipe_id == recipe_id)
+                .filter(DishImage.image_number == image_number)
+                .first()
+            )
+
+            if not dish_image or not dish_image.thumbnail_data:
+                return jsonify(
+                    {"error": f"No thumbnail available for dish image {image_number}"}
+                ), 404
+
+            # Return thumbnail as PNG
+            return Response(
+                dish_image.thumbnail_data,
+                mimetype="image/png",
+                headers={
+                    "Content-Disposition": f"inline; filename=recipe_{recipe_id}_dish{image_number}_thumb.png"
+                },
+            )
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@flask_app.route(
+    "/api/recipe/<int:recipe_id>/dish/<int:image_number>/image", methods=["GET"]
+)
+def get_dish_image(recipe_id: int, image_number: int):
+    """
+    Get the full image for a specific dish image.
+    Returns the image data as PNG.
+    """
+    if db_engine is None:
+        return jsonify({"error": "Database not initialized"}), 500
+
+    try:
+        with Session(db_engine) as session:
+            recipe = session.get(Recipe, recipe_id)
+
+            if not recipe:
+                return jsonify({"error": "Recipe not found"}), 404
+
+            # Get the specific dish image
+            dish_image = (
+                session.query(DishImage)
+                .filter(DishImage.recipe_id == recipe_id)
+                .filter(DishImage.image_number == image_number)
+                .first()
+            )
+
+            if not dish_image or not dish_image.image_data:
+                return jsonify(
+                    {"error": f"No image available for dish image {image_number}"}
+                ), 404
+
+            # Return image as PNG
+            return Response(
+                dish_image.image_data,
+                mimetype="image/png",
+                headers={
+                    "Content-Disposition": f"inline; filename=recipe_{recipe_id}_dish{image_number}.png"
+                },
+            )
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @flask_app.route("/api/recipe/<int:recipe_id>/rotation", methods=["POST"])
 def update_recipe_rotation(recipe_id: int):
     """
-    Update the rotation value for a specific recipe (page 1 image).
-    Expects JSON: {"rotation": 0|90|180|270}
+    Update the rotation value for a specific recipe image.
+    Expects JSON: {"rotation": 0|90|180|270, "image_type": "recipe"|"page"|"dish", "page_number": int (optional), "dish_number": int (optional)}
     """
     if db_engine is None:
         return jsonify({"error": "Database not initialized"}), 500
@@ -581,27 +775,60 @@ def update_recipe_rotation(recipe_id: int):
         if rotation not in [0, 90, 180, 270]:
             return jsonify({"error": "Rotation must be 0, 90, 180, or 270"}), 400
 
+        image_type = data.get(
+            "image_type", "recipe"
+        )  # Default to 'recipe' for backward compatibility
+        page_number = data.get("page_number")
+        dish_number = data.get("dish_number")
+
         with Session(db_engine) as session:
             recipe = session.get(Recipe, recipe_id)
 
             if not recipe:
                 return jsonify({"error": "Recipe not found"}), 404
 
-            # Get page 1 image (pdf_page_number = 0)
-            recipe_image = (
-                session.query(RecipeImage)
-                .filter(RecipeImage.recipe_id == recipe_id)
-                .filter(RecipeImage.pdf_page_number == 0)
-                .first()
-            )
+            if image_type == "page" and page_number is not None:
+                # Update specific page image
+                recipe_image = (
+                    session.query(RecipeImage)
+                    .filter(RecipeImage.recipe_id == recipe_id)
+                    .filter(RecipeImage.pdf_page_number == page_number)
+                    .first()
+                )
+                if not recipe_image:
+                    return jsonify(
+                        {"error": f"No image found for page {page_number + 1}"}
+                    ), 404
+                recipe_image.rotation = rotation
+                session.add(recipe_image)
+            elif image_type == "dish" and dish_number is not None:
+                # Update specific dish image
+                dish_image = (
+                    session.query(DishImage)
+                    .filter(DishImage.recipe_id == recipe_id)
+                    .filter(DishImage.image_number == dish_number)
+                    .first()
+                )
+                if not dish_image:
+                    return jsonify(
+                        {"error": f"No image found for dish image {dish_number}"}
+                    ), 404
+                dish_image.rotation = rotation
+                session.add(dish_image)
+            else:
+                # Default to page 1 image (backward compatibility)
+                recipe_image = (
+                    session.query(RecipeImage)
+                    .filter(RecipeImage.recipe_id == recipe_id)
+                    .filter(RecipeImage.pdf_page_number == 0)
+                    .first()
+                )
+                if not recipe_image:
+                    return jsonify({"error": "No image found for page 1"}), 404
+                recipe_image.rotation = rotation
+                session.add(recipe_image)
 
-            if not recipe_image:
-                return jsonify({"error": "No image found for page 1"}), 404
-
-            recipe_image.rotation = rotation
-            session.add(recipe_image)
             session.commit()
-
             return jsonify({"success": True, "rotation": rotation})
 
     except Exception as e:
