@@ -836,6 +836,62 @@ def update_recipe_rotation(recipe_id: int):
         return jsonify({"error": str(e)}), 500
 
 
+@flask_app.route("/api/recipe/<int:recipe_id>", methods=["PUT"])
+def update_recipe(recipe_id: int):
+    """
+    Update recipe fields.
+    Expects JSON with any of: title, description, year, author, ingredients, recipe, cook_time, notes, state
+    """
+    if db_engine is None:
+        return jsonify({"error": "Database not initialized"}), 500
+
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+
+        with Session(db_engine) as session:
+            recipe = session.get(Recipe, recipe_id)
+
+            if not recipe:
+                return jsonify({"error": "Recipe not found"}), 404
+
+            # Update fields if provided
+            if "title" in data:
+                recipe.title = data["title"] if data["title"] else None
+            if "description" in data:
+                recipe.description = (
+                    data["description"] if data["description"] else None
+                )
+            if "year" in data:
+                recipe.year = int(data["year"]) if data["year"] else None
+            if "author" in data:
+                recipe.author = data["author"] if data["author"] else None
+            if "ingredients" in data:
+                recipe.ingredients = (
+                    data["ingredients"] if data["ingredients"] else None
+                )
+            if "recipe" in data:
+                recipe.recipe = data["recipe"] if data["recipe"] else None
+            if "cook_time" in data:
+                recipe.cook_time = data["cook_time"] if data["cook_time"] else None
+            if "notes" in data:
+                recipe.notes = data["notes"] if data["notes"] else None
+            if "state" in data:
+                try:
+                    recipe.state = RecipeState(data["state"])
+                except ValueError:
+                    return jsonify({"error": f"Invalid state: {data['state']}"}), 400
+
+            session.add(recipe)
+            session.commit()
+
+            return jsonify({"success": True, "message": "Recipe updated successfully"})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 # Get path to user's home directory
 HOME_DIR = Path.home()
 

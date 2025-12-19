@@ -256,7 +256,9 @@
         .recipes-table {
             width: 100%;
             border-collapse: collapse;
+            border-spacing: 0;
             margin-top: 20px;
+            table-layout: auto;
         }
 
         .recipes-table th,
@@ -264,6 +266,19 @@
             padding: 12px;
             text-align: left;
             border-bottom: 1px solid #e0e0e0;
+            background: inherit;
+            border-left: none;
+            border-right: none;
+        }
+        
+        .recipes-table th:first-child,
+        .recipes-table td:first-child {
+            padding-left: 12px;
+        }
+        
+        .recipes-table th:last-child,
+        .recipes-table td:last-child {
+            padding-right: 12px;
         }
 
         .recipes-table th {
@@ -469,6 +484,8 @@
         .thumbnail-column {
             width: 120px;
             text-align: center;
+            overflow: hidden;
+            vertical-align: middle;
         }
 
         .thumbnail-img {
@@ -482,13 +499,6 @@
             cursor: pointer;
             transition: transform 0.2s, box-shadow 0.2s;
             transform-origin: center center;
-        }
-        
-        .thumbnail-column {
-            overflow: hidden;
-            display: flex;
-            align-items: center;
-            justify-content: center;
         }
 
         .thumbnail-img:hover {
@@ -710,7 +720,7 @@
 
         <div class="tabs">
             <div class="tab" data-tab="upload">📤 Upload</div>
-            <div class="tab active" data-tab="view">🔍 View</div>
+            <div class="tab active" data-tab="view">⚙️ Admin</div>
         </div>
 
         <!-- Upload Tab -->
@@ -786,8 +796,6 @@
                             <th class="timestamp-column">Upload Date/Time</th>
                             <th class="filename-column">Title/PDF Filename</th>
                             <th class="state-column">State</th>
-                            <th class="expand-column">Expand</th>
-                            <th class="edit-column">Edit</th>
                         </tr>
                     </thead>
                     <tbody id="recipesTableBody">
@@ -1154,23 +1162,14 @@
                 const stateInfo = getStateInfo(state);
                 const stateBadge = `<span class="state-badge state-${state}">${stateInfo.emoji} ${stateInfo.label}</span>`;
                 
-                // Expand icon
-                const expandIcon = `<span class="expand-icon" data-recipe-id="${recipe.id}" title="Expand row">➕</span>`;
-                
-                // Edit icon
-                const editIcon = recipe.id
-                    ? `<span class="edit-icon" data-recipe-id="${recipe.id}" title="Edit recipe">✏️</span>`
-                    : '<span style="color: #ccc;">—</span>';
-                
                 row.innerHTML = `
                     <td class="count-column">${recipe.count}</td>
                     <td class="thumbnail-column">${thumbnail}</td>
                     <td class="timestamp-column">${formatTimestamp(recipe.upload_timestamp)}</td>
                     <td class="filename-column">${escapeHtml(recipe.title || recipe.pdf_filename || 'Unknown')}</td>
                     <td class="state-column">${stateBadge}</td>
-                    <td class="expand-column">${expandIcon}</td>
-                    <td class="edit-column">${editIcon}</td>
                 `;
+                row.setAttribute('data-pdf-filename', recipe.pdf_filename || '');
                 recipesTableBody.appendChild(row);
 
                 // Expandable content row
@@ -1178,38 +1177,20 @@
                 expandRow.className = 'expandable-row-content';
                 expandRow.setAttribute('data-recipe-id', recipe.id || '');
                 const expandCell = document.createElement('td');
-                expandCell.colSpan = 7; // Count, Thumbnail, Timestamp, Filename, State, Expand, Edit
+                expandCell.colSpan = 5; // Count, Thumbnail, Timestamp, Filename, State
                 expandCell.innerHTML = '<div class="detail-grid"><div class="detail-label">Loading...</div><div class="detail-value"></div></div>';
                 expandRow.appendChild(expandCell);
                 recipesTableBody.appendChild(expandRow);
 
-                // Add click handler to main row (but not to preview icon, thumbnail, or edit icon)
+                // Add click handler to main row (but not to preview icon, thumbnail, or save button)
                 row.addEventListener('click', function(e) {
-                    // Don't expand if clicking on thumbnail or edit icon
-                    if (e.target.closest('.thumbnail-img') || e.target.closest('.edit-icon')) {
+                    // Don't expand if clicking on thumbnail or save button
+                    if (e.target.closest('.thumbnail-img') || e.target.closest('.save-recipe-btn')) {
                         return;
                     }
                     toggleRowExpansion(recipe.id);
                 });
 
-                // Add click handler to expand icon
-                const expandIconElement = row.querySelector('.expand-icon');
-                if (expandIconElement) {
-                    expandIconElement.addEventListener('click', function(e) {
-                        e.stopPropagation();
-                        toggleRowExpansion(recipe.id);
-                    });
-                }
-
-                // Add click handler to edit icon
-                const editIconElement = row.querySelector('.edit-icon');
-                if (editIconElement) {
-                    editIconElement.addEventListener('click', function(e) {
-                        e.stopPropagation();
-                        // Edit functionality will be added later
-                        console.log('Edit recipe:', recipe.id);
-                    });
-                }
             });
 
             // Now fetch all recipe details in parallel and update thumbnails
@@ -1360,7 +1341,6 @@
         async function toggleRowExpansion(recipeId) {
             const expandRow = document.querySelector(`.expandable-row-content[data-recipe-id="${recipeId}"]`);
             const mainRow = document.querySelector(`tr.expandable[data-recipe-id="${recipeId}"]`);
-            const expandIcon = document.querySelector(`.expand-icon[data-recipe-id="${recipeId}"]`);
             
             if (!expandRow || !mainRow) return;
 
@@ -1368,7 +1348,6 @@
             if (expandedRecipeId === recipeId) {
                 expandRow.classList.remove('expanded');
                 mainRow.classList.remove('expanded');
-                if (expandIcon) expandIcon.classList.remove('expanded');
                 expandedRecipeId = null;
                 return;
             }
@@ -1377,16 +1356,13 @@
             if (expandedRecipeId !== null) {
                 const prevExpandRow = document.querySelector(`.expandable-row-content[data-recipe-id="${expandedRecipeId}"]`);
                 const prevMainRow = document.querySelector(`tr.expandable[data-recipe-id="${expandedRecipeId}"]`);
-                const prevExpandIcon = document.querySelector(`.expand-icon[data-recipe-id="${expandedRecipeId}"]`);
                 if (prevExpandRow) prevExpandRow.classList.remove('expanded');
                 if (prevMainRow) prevMainRow.classList.remove('expanded');
-                if (prevExpandIcon) prevExpandIcon.classList.remove('expanded');
             }
 
             // Expand new row
             expandRow.classList.add('expanded');
             mainRow.classList.add('expanded');
-            if (expandIcon) expandIcon.classList.add('expanded');
             expandedRecipeId = recipeId;
 
             // Load recipe details if not already loaded
@@ -1402,7 +1378,15 @@
                     
                     const data = await response.json();
 
-                    // Format the details
+                    // Format the details with editable fields
+                    const stateOptions = ['not_started', 'partially_complete', 'complete', 'broken', 'duplicate'];
+                    const stateOptionLabels = {
+                        'not_started': 'Not Started',
+                        'partially_complete': 'In Progress',
+                        'complete': 'Complete',
+                        'broken': 'Broken',
+                        'duplicate': 'Duplicate'
+                    };
                     detailGrid.innerHTML = `
                         <div class="detail-label">Recipe Filename:</div>
                         <div class="detail-value">${escapeHtml(data.pdf_filename || 'N/A')}</div>
@@ -1417,37 +1401,64 @@
                         <div class="detail-value">${formatFileSize(data.original_pdf_size)}</div>
                         
                         <div class="detail-label">State:</div>
-                        <div class="detail-value">${data.state || '<span class="empty">Not set</span>'}</div>
+                        <div class="detail-value">
+                            <select class="editable-field" data-field="state" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px;">
+                                ${stateOptions.map(state => `<option value="${state}" ${data.state === state ? 'selected' : ''}>${stateOptionLabels[state]}</option>`).join('')}
+                            </select>
+                        </div>
                         
                         <div class="detail-label">Title:</div>
-                        <div class="detail-value">${data.title ? escapeHtml(data.title) : '<span class="empty">Not set</span>'}</div>
+                        <div class="detail-value">
+                            <input type="text" class="editable-field" data-field="title" value="${escapeHtml(data.title || '')}" placeholder="Not set" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
                         
                         <div class="detail-label">Description:</div>
-                        <div class="detail-value">${data.description ? escapeHtml(data.description) : '<span class="empty">Not set</span>'}</div>
+                        <div class="detail-value">
+                            <textarea class="editable-field" data-field="description" placeholder="Not set" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; min-height: 60px; resize: vertical;">${escapeHtml(data.description || '')}</textarea>
+                        </div>
                         
                         <div class="detail-label">Year:</div>
-                        <div class="detail-value">${data.year || '<span class="empty">Not set</span>'}</div>
+                        <div class="detail-value">
+                            <input type="number" class="editable-field" data-field="year" value="${data.year || ''}" placeholder="Not set" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
                         
                         <div class="detail-label">Author:</div>
-                        <div class="detail-value">${data.author ? escapeHtml(data.author) : '<span class="empty">Not set</span>'}</div>
+                        <div class="detail-value">
+                            <input type="text" class="editable-field" data-field="author" value="${escapeHtml(data.author || '')}" placeholder="Not set" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
                         
                         <div class="detail-label">Ingredients:</div>
-                        <div class="detail-value">${data.ingredients ? escapeHtml(data.ingredients) : '<span class="empty">Not set</span>'}</div>
+                        <div class="detail-value">
+                            <textarea class="editable-field" data-field="ingredients" placeholder="Not set" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; min-height: 80px; resize: vertical;">${escapeHtml(data.ingredients || '')}</textarea>
+                        </div>
                         
                         <div class="detail-label">Recipe:</div>
-                        <div class="detail-value">${data.recipe ? escapeHtml(data.recipe) : '<span class="empty">Not set</span>'}</div>
+                        <div class="detail-value">
+                            <textarea class="editable-field" data-field="recipe" placeholder="Not set" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; min-height: 80px; resize: vertical;">${escapeHtml(data.recipe || '')}</textarea>
+                        </div>
                         
                         <div class="detail-label">Cook Time:</div>
-                        <div class="detail-value">${data.cook_time ? escapeHtml(data.cook_time) : '<span class="empty">Not set</span>'}</div>
+                        <div class="detail-value">
+                            <input type="text" class="editable-field" data-field="cook_time" value="${escapeHtml(data.cook_time || '')}" placeholder="Not set" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
                         
                         <div class="detail-label">Notes:</div>
-                        <div class="detail-value">${data.notes ? escapeHtml(data.notes) : '<span class="empty">Not set</span>'}</div>
+                        <div class="detail-value">
+                            <textarea class="editable-field" data-field="notes" placeholder="Not set" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; min-height: 60px; resize: vertical;">${escapeHtml(data.notes || '')}</textarea>
+                        </div>
                         
                         <div class="detail-label">Total Pages:</div>
                         <div class="detail-value">${data.total_pages || 0}</div>
                         
                         <div class="detail-label">Total Dish Images:</div>
                         <div class="detail-value">${data.total_dish_images || 0}</div>
+                        
+                        <div style="grid-column: 1 / -1; margin-top: 20px; margin-bottom: 10px;">
+                            <button id="save-recipe-btn-${recipeId}" class="save-recipe-btn" data-recipe-id="${recipeId}" type="button" style="background: #667eea; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px; transition: background 0.2s; position: relative; z-index: 10;" onmouseover="this.style.background='#5568d3';" onmouseout="this.style.background='#667eea';">
+                                💾 Save Changes
+                            </button>
+                            <span id="save-status-${recipeId}" style="margin-left: 15px; color: #666;"></span>
+                        </div>
                     `;
                     
                     // Add sub-expandable section for recipe images (PDF pages)
@@ -1598,6 +1609,117 @@
                         <div class="detail-value">This recipe may not have RecipeImage entries. Try re-uploading the PDF.</div>
                     `;
                 }
+            }
+        }
+        
+        async function saveRecipeChanges(recipeId) {
+            console.log('saveRecipeChanges called for recipe', recipeId);
+            const saveBtn = document.getElementById(`save-recipe-btn-${recipeId}`);
+            const statusSpan = document.getElementById(`save-status-${recipeId}`);
+            
+            if (!saveBtn) {
+                console.error('Save button not found for recipe', recipeId);
+                return;
+            }
+            if (!statusSpan) {
+                console.error('Status span not found for recipe', recipeId);
+                return;
+            }
+            
+            // Collect all field values
+            const fields = {};
+            const editableFields = document.querySelectorAll(`.expandable-row-content[data-recipe-id="${recipeId}"] .editable-field`);
+            
+            console.log('Found', editableFields.length, 'editable fields');
+            
+            editableFields.forEach(field => {
+                const fieldName = field.getAttribute('data-field');
+                if (fieldName) {
+                    if (field.tagName === 'TEXTAREA' || field.tagName === 'INPUT') {
+                        fields[fieldName] = field.value || null;
+                    } else if (field.tagName === 'SELECT') {
+                        fields[fieldName] = field.value;
+                    }
+                    console.log('Field', fieldName, '=', fields[fieldName]);
+                }
+            });
+            
+            // Convert year to number if provided
+            if (fields.year !== null && fields.year !== undefined && fields.year !== '') {
+                const yearNum = parseInt(fields.year, 10);
+                if (!isNaN(yearNum)) {
+                    fields.year = yearNum;
+                } else {
+                    fields.year = null;
+                }
+            } else {
+                fields.year = null;
+            }
+            
+            console.log('Saving fields:', fields);
+            
+            // Show saving status
+            saveBtn.disabled = true;
+            saveBtn.style.opacity = '0.6';
+            statusSpan.textContent = 'Saving...';
+            statusSpan.style.color = '#666';
+            
+            try {
+                const response = await fetch(`/api/recipe/${recipeId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(fields)
+                });
+                
+                console.log('Response status:', response.status);
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+                    console.error('Error response:', errorData);
+                    throw new Error(errorData.error || 'Failed to save changes');
+                }
+                
+                const result = await response.json();
+                console.log('Save result:', result);
+                
+                statusSpan.textContent = '✓ Saved successfully';
+                statusSpan.style.color = '#28a745';
+                
+                // Update the main table row with any changed fields
+                const mainRow = document.querySelector(`tr.expandable[data-recipe-id="${recipeId}"]`);
+                if (mainRow) {
+                    // Update title if it changed
+                    if (fields.title !== undefined) {
+                        const filenameCell = mainRow.querySelector('.filename-column');
+                        if (filenameCell) {
+                            filenameCell.textContent = fields.title || mainRow.getAttribute('data-pdf-filename') || 'Unknown';
+                        }
+                    }
+                    
+                    // Update state badge if it changed
+                    if (fields.state !== undefined) {
+                        const stateCell = mainRow.querySelector('.state-column');
+                        if (stateCell) {
+                            const stateInfo = getStateInfo(fields.state);
+                            stateCell.innerHTML = `<span class="state-badge state-${fields.state}">${stateInfo.emoji} ${stateInfo.label}</span>`;
+                        }
+                    }
+                }
+                
+                // Reset status after 3 seconds
+                setTimeout(() => {
+                    statusSpan.textContent = '';
+                }, 3000);
+                
+            } catch (error) {
+                console.error('Save error:', error);
+                statusSpan.textContent = '✗ Error: ' + error.message;
+                statusSpan.style.color = '#c33';
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.style.opacity = '1';
             }
         }
 
@@ -1884,6 +2006,21 @@
             }
         });
 
+        // Event delegation for save buttons (works for dynamically added buttons)
+        document.addEventListener('click', async function(e) {
+            // Check if clicked element is the save button or inside it
+            const saveBtn = e.target.closest('.save-recipe-btn');
+            if (saveBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                const recipeId = saveBtn.getAttribute('data-recipe-id');
+                if (recipeId) {
+                    console.log('Save button clicked via delegation for recipe', recipeId);
+                    await saveRecipeChanges(parseInt(recipeId, 10));
+                }
+            }
+        });
+        
         // Load recipes on page load if View tab is active
         if (document.getElementById('view-tab').classList.contains('active')) {
             loadRecipes();
