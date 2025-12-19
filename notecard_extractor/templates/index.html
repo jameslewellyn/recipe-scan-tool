@@ -1760,10 +1760,18 @@
                         currentGroupType = 'recipe';
                         currentImageGroup = data.pages || [];
                         currentImageIndex = currentImageGroup.findIndex(p => p.pdf_page_number === pageNumber);
+                        if (currentImageIndex === -1) {
+                            // If page not found, default to first page
+                            currentImageIndex = 0;
+                        }
                     } else if (imageType === 'dish' && dishNumber !== null) {
                         currentGroupType = 'dish';
                         currentImageGroup = data.dish_images || [];
                         currentImageIndex = currentImageGroup.findIndex(d => d.image_number === dishNumber);
+                        if (currentImageIndex === -1) {
+                            // If dish image not found, default to first dish image
+                            currentImageIndex = 0;
+                        }
                     } else {
                         // Default to recipe page 1
                         currentGroupType = 'recipe';
@@ -1789,23 +1797,33 @@
             let imageUrl;
             let rotation = 0;
             
-            if (currentGroupType === 'recipe' && currentImageGroup.length > 0 && currentImageIndex >= 0) {
+            console.log('loadCurrentImage called:', {
+                currentGroupType,
+                currentImageGroupLength: currentImageGroup.length,
+                currentImageIndex,
+                recipeIdNum
+            });
+            
+            if (currentGroupType === 'recipe' && currentImageGroup.length > 0 && currentImageIndex >= 0 && currentImageIndex < currentImageGroup.length) {
                 const page = currentImageGroup[currentImageIndex];
                 currentPageNumber = page.pdf_page_number;
                 imageUrl = `/api/recipe/${recipeIdNum}/page/${page.pdf_page_number}/image`;
                 rotation = page.rotation || 0;
-            } else if (currentGroupType === 'dish' && currentImageGroup.length > 0 && currentImageIndex >= 0) {
+                console.log('Loading recipe page image:', imageUrl, 'page number:', page.pdf_page_number);
+            } else if (currentGroupType === 'dish' && currentImageGroup.length > 0 && currentImageIndex >= 0 && currentImageIndex < currentImageGroup.length) {
                 const dishImg = currentImageGroup[currentImageIndex];
                 currentDishNumber = dishImg.image_number;
                 imageUrl = `/api/recipe/${recipeIdNum}/dish/${dishImg.image_number}/image`;
                 rotation = dishImg.rotation || 0;
+                console.log('Loading dish image:', imageUrl, 'dish number:', dishImg.image_number);
             } else {
                 // Default to recipe page 1
                 imageUrl = `/api/recipe/${recipeIdNum}/image`;
-                if (recipeData) {
-                    const page = recipeData.pages?.[0];
-                    rotation = page ? (page.rotation || 0) : 0;
+                if (recipeData && recipeData.pages && recipeData.pages.length > 0) {
+                    const page = recipeData.pages[0];
+                    rotation = page.rotation || 0;
                 }
+                console.log('Loading default recipe image:', imageUrl);
             }
             
             currentRotation = rotation;
