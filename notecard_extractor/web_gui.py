@@ -313,6 +313,7 @@ def get_recipes():
                         "count": idx,
                         "upload_timestamp": upload_time,
                         "pdf_filename": recipe.pdf_filename or "Unknown",
+                        "title": recipe.title,
                         "pdf_size": pdf_size,
                         "rotation": rotation,
                         "state": recipe.state.value if recipe.state else "not_started",

@@ -535,12 +535,13 @@
             flex-direction: column;
             align-items: center;
             justify-content: space-between;
-            padding: 60px 20px 30px 20px;
+            padding: 60px 80px 30px 80px;
             box-sizing: border-box;
+            position: relative;
         }
 
         .image-overlay-content img {
-            max-width: min(95vw, calc(100vh - 150px));
+            max-width: min(calc(95vw - 160px), calc(100vh - 150px));
             max-height: calc(100vh - 150px);
             width: auto;
             height: auto;
@@ -601,6 +602,38 @@
             font-weight: 600;
             min-width: 80px;
             text-align: center;
+        }
+
+        .image-nav-arrow {
+            position: fixed;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            font-size: 4em;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border-radius: 50%;
+            z-index: 1002;
+            transition: all 0.2s;
+            user-select: none;
+        }
+
+        .image-nav-arrow:hover {
+            background: rgba(0, 0, 0, 0.8);
+            transform: translateY(-50%) scale(1.1);
+        }
+
+        .image-nav-left {
+            left: 20px;
+        }
+
+        .image-nav-right {
+            right: 20px;
         }
 
         .image-overlay-close {
@@ -749,12 +782,11 @@
                     <thead>
                         <tr>
                             <th class="count-column">#</th>
-                            <th class="thumbnail-column">Thumbnail</th>
+                            <th class="thumbnail-column">Images</th>
                             <th class="timestamp-column">Upload Date/Time</th>
-                            <th class="filename-column">Recipe Name</th>
+                            <th class="filename-column">Title/PDF Filename</th>
                             <th class="state-column">State</th>
                             <th class="expand-column">Expand</th>
-                            <th class="image-column">Image</th>
                             <th class="edit-column">Edit</th>
                         </tr>
                     </thead>
@@ -774,7 +806,9 @@
         <div id="imageOverlay" class="image-overlay">
             <div class="image-overlay-content">
                 <div class="image-overlay-close" id="imageOverlayClose">×</div>
+                <div class="image-nav-arrow image-nav-left" id="imageNavLeft" style="display: none;">‹</div>
                 <img id="previewImage" src="" alt="Recipe Preview">
+                <div class="image-nav-arrow image-nav-right" id="imageNavRight" style="display: none;">›</div>
                 <div class="rotation-controls">
                     <div class="rotation-button" id="rotateCounterClockwise" title="Rotate counter-clockwise">↶</div>
                     <div class="rotation-display" id="rotationDisplay">0°</div>
@@ -1083,7 +1117,7 @@
             }
         }
 
-        function displayRecipes(recipes) {
+        async function displayRecipes(recipes) {
             // Reset expanded state when reloading
             expandedRecipeId = null;
             
@@ -1098,18 +1132,22 @@
             recipeCount.style.display = 'block';
 
             recipesTableBody.innerHTML = '';
+            
+            // First, render all rows with basic thumbnails
+            const recipeRows = new Map();
             recipes.forEach(recipe => {
                 // Main row
                 const row = document.createElement('tr');
                 row.className = 'expandable';
                 row.setAttribute('data-recipe-id', recipe.id || '');
-                const previewIcon = recipe.id 
-                    ? `<span class="preview-icon" data-recipe-id="${recipe.id}" title="Preview image">🔍</span>`
-                    : '<span style="color: #ccc;">—</span>';
                 const rotation = recipe.rotation !== undefined ? recipe.rotation : 0;
+                
+                // Placeholder thumbnail - will be updated after fetching details
                 const thumbnail = recipe.id
-                    ? `<div style="width: 100px; height: 100px; display: flex; align-items: center; justify-content: center; overflow: hidden; margin: 0 auto;"><img src="/api/recipe/${recipe.id}/thumbnail" alt="Thumbnail" class="thumbnail-img" data-recipe-id="${recipe.id}" data-rotation="${rotation}" style="max-width: 100px; max-height: 100px; width: auto; height: auto; object-fit: contain; transform: rotate(${rotation}deg);" title="Click to preview"></div>`
+                    ? `<div class="thumbnail-placeholder" data-recipe-id="${recipe.id}" style="display: flex; flex-direction: column; align-items: center; gap: 8px; min-height: 100px;"><div style="width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; background: #f5f5f5; border-radius: 4px;"><span style="color: #999; font-size: 0.8em;">Loading...</span></div></div>`
                     : '<span style="color: #ccc;">—</span>';
+                
+                recipeRows.set(recipe.id, { row, recipe });
                 
                 // Format state with emoji and badge
                 const state = recipe.state || 'not_started';
@@ -1128,10 +1166,9 @@
                     <td class="count-column">${recipe.count}</td>
                     <td class="thumbnail-column">${thumbnail}</td>
                     <td class="timestamp-column">${formatTimestamp(recipe.upload_timestamp)}</td>
-                    <td class="filename-column">${escapeHtml(recipe.pdf_filename)}</td>
+                    <td class="filename-column">${escapeHtml(recipe.title || recipe.pdf_filename || 'Unknown')}</td>
                     <td class="state-column">${stateBadge}</td>
                     <td class="expand-column">${expandIcon}</td>
-                    <td class="image-column">${previewIcon}</td>
                     <td class="edit-column">${editIcon}</td>
                 `;
                 recipesTableBody.appendChild(row);
@@ -1141,15 +1178,15 @@
                 expandRow.className = 'expandable-row-content';
                 expandRow.setAttribute('data-recipe-id', recipe.id || '');
                 const expandCell = document.createElement('td');
-                expandCell.colSpan = 8; // Count, Thumbnail, Timestamp, Filename, State, Expand, Image, Edit
+                expandCell.colSpan = 7; // Count, Thumbnail, Timestamp, Filename, State, Expand, Edit
                 expandCell.innerHTML = '<div class="detail-grid"><div class="detail-label">Loading...</div><div class="detail-value"></div></div>';
                 expandRow.appendChild(expandCell);
                 recipesTableBody.appendChild(expandRow);
 
                 // Add click handler to main row (but not to preview icon, thumbnail, or edit icon)
                 row.addEventListener('click', function(e) {
-                    // Don't expand if clicking on preview icon, thumbnail, or edit icon
-                    if (e.target.closest('.preview-icon') || e.target.closest('.thumbnail-img') || e.target.closest('.edit-icon')) {
+                    // Don't expand if clicking on thumbnail or edit icon
+                    if (e.target.closest('.thumbnail-img') || e.target.closest('.edit-icon')) {
                         return;
                     }
                     toggleRowExpansion(recipe.id);
@@ -1175,35 +1212,117 @@
                 }
             });
 
+            // Now fetch all recipe details in parallel and update thumbnails
+            const recipesWithIds = recipes.filter(r => r.id);
+            if (recipesWithIds.length > 0) {
+                try {
+                    const recipeDetailsPromises = recipesWithIds.map(recipe => 
+                        fetch(`/api/recipe/${recipe.id}`).then(r => r.json()).catch(err => {
+                            console.error(`Error fetching recipe ${recipe.id}:`, err);
+                            return null;
+                        })
+                    );
+                    
+                    const recipeDetails = await Promise.all(recipeDetailsPromises);
+                    
+                    // Update thumbnails for each recipe
+                    recipeDetails.forEach((recipeData, index) => {
+                        if (!recipeData) return;
+                        
+                        const recipe = recipesWithIds[index];
+                        const placeholder = document.querySelector(`.thumbnail-placeholder[data-recipe-id="${recipe.id}"]`);
+                        if (!placeholder) return;
+                        
+                        const thumbnails = [];
+                        
+                        // Add recipe image (page 1) if it exists
+                        if (recipeData.pages && recipeData.pages.length > 0) {
+                            const page1 = recipeData.pages[0];
+                            const page1Rotation = page1.rotation || 0;
+                            thumbnails.push({
+                                type: 'recipe',
+                                url: `/api/recipe/${recipe.id}/page/${page1.pdf_page_number}/thumbnail`,
+                                rotation: page1Rotation,
+                                label: 'Recipe Images',
+                                pageNumber: page1.pdf_page_number
+                            });
+                        }
+                        
+                        // Add dish image (first one) if it exists
+                        if (recipeData.dish_images && recipeData.dish_images.length > 0) {
+                            const dish1 = recipeData.dish_images[0];
+                            const dish1Rotation = dish1.rotation || 0;
+                            thumbnails.push({
+                                type: 'dish',
+                                url: `/api/recipe/${recipe.id}/dish/${dish1.image_number}/thumbnail`,
+                                rotation: dish1Rotation,
+                                label: 'Dish Images',
+                                dishNumber: dish1.image_number
+                            });
+                        }
+                        
+                        if (thumbnails.length > 0) {
+                            let thumbnailHtml = '<div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">';
+                            thumbnails.forEach(thumb => {
+                                thumbnailHtml += `
+                                    <div class="thumbnail-container" style="display: flex; flex-direction: column; align-items: center;">
+                                        <div style="width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                                            <img src="${thumb.url}" alt="${thumb.label} thumbnail" class="thumbnail-img" data-recipe-id="${recipe.id}" data-image-type="${thumb.type}" data-page-number="${thumb.pageNumber || ''}" data-dish-number="${thumb.dishNumber || ''}" style="max-width: 80px; max-height: 80px; width: auto; height: auto; object-fit: contain; transform: rotate(${thumb.rotation}deg); cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; border-radius: 4px; border: 1px solid #e0e0e0;" onmouseover="this.style.boxShadow='0 4px 8px rgba(0,0,0,0.2)';" onmouseout="this.style.boxShadow='';">
+                                        </div>
+                                        <span class="thumbnail-label" style="font-size: 0.6em; color: #666; margin-top: 2px;">${thumb.label}</span>
+                                    </div>
+                                `;
+                            });
+                            thumbnailHtml += '</div>';
+                            placeholder.outerHTML = thumbnailHtml;
+                        } else {
+                            placeholder.outerHTML = '<span style="color: #ccc;">—</span>';
+                        }
+                    });
+                } catch (error) {
+                    console.error('Error updating thumbnails:', error);
+                }
+            }
+
             // Add click handlers and error handlers for thumbnails
             document.querySelectorAll('.thumbnail-img').forEach(thumbnail => {
                 thumbnail.addEventListener('click', function(e) {
                     e.stopPropagation();
                     const recipeId = this.getAttribute('data-recipe-id');
+                    const imageType = this.getAttribute('data-image-type');
+                    const pageNumber = this.getAttribute('data-page-number');
+                    const dishNumber = this.getAttribute('data-dish-number');
+                    
                     if (recipeId) {
-                        showImagePreview(recipeId);
+                        if (imageType === 'recipe' && pageNumber !== null && pageNumber !== '') {
+                            showImagePreview(recipeId, 'page', parseInt(pageNumber, 10));
+                        } else if (imageType === 'dish' && dishNumber !== null && dishNumber !== '') {
+                            showImagePreview(recipeId, 'dish', null, parseInt(dishNumber, 10));
+                        } else {
+                            showImagePreview(recipeId);
+                        }
                     }
                 });
                 thumbnail.addEventListener('error', function() {
                     const recipeId = this.getAttribute('data-recipe-id');
                     console.error('Failed to load thumbnail for recipe', recipeId);
                     this.onerror = null;
-                    this.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dominant-baseline="middle" fill="%23ccc"%3ENo Image%3C/text%3E%3C/svg%3E';
-                    this.style.cursor = 'default';
-                    this.title = 'No thumbnail available';
-                });
-            });
-
-            // Add click handlers for preview icons
-            document.querySelectorAll('.preview-icon').forEach(icon => {
-                icon.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    const recipeId = this.getAttribute('data-recipe-id');
-                    if (recipeId) {
-                        showImagePreview(recipeId);
+                    // Hide the thumbnail and its label
+                    const container = this.closest('.thumbnail-container');
+                    if (container) {
+                        // Hide the entire container (image + label)
+                        container.style.display = 'none';
+                    } else {
+                        this.style.display = 'none';
+                        // Also hide the label if it exists
+                        const label = this.nextElementSibling;
+                        if (label && label.classList && label.classList.contains('thumbnail-label')) {
+                            label.style.display = 'none';
+                        }
                     }
                 });
             });
+
 
             recipesTableContainer.style.display = 'block';
             viewEmptyState.style.display = 'none';
@@ -1495,6 +1614,9 @@
         let currentImageType = null; // 'recipe', 'page', or 'dish'
         let currentPageNumber = null;
         let currentDishNumber = null;
+        let currentImageIndex = 0; // Index within current group
+        let currentImageGroup = []; // Array of images in current group
+        let currentGroupType = null; // 'recipe' or 'dish'
 
         function showImagePreview(recipeId, imageType = 'recipe', pageNumber = null, dishNumber = null) {
             // Convert recipeId to number for comparison
@@ -1507,68 +1629,116 @@
             // Reset rotation display while loading
             rotationDisplay.textContent = 'Loading...';
             
-            // Determine image URL and rotation based on image type
+            // Load recipe data to get image groups
+            fetch(`/api/recipe/${recipeIdNum}`)
+                .then(response => response.json())
+                .then(data => {
+                    // Determine which group we're in and set up navigation
+                    if (imageType === 'page' && pageNumber !== null) {
+                        currentGroupType = 'recipe';
+                        currentImageGroup = data.pages || [];
+                        currentImageIndex = currentImageGroup.findIndex(p => p.pdf_page_number === pageNumber);
+                    } else if (imageType === 'dish' && dishNumber !== null) {
+                        currentGroupType = 'dish';
+                        currentImageGroup = data.dish_images || [];
+                        currentImageIndex = currentImageGroup.findIndex(d => d.image_number === dishNumber);
+                    } else {
+                        // Default to recipe page 1
+                        currentGroupType = 'recipe';
+                        currentImageGroup = data.pages || [];
+                        currentImageIndex = 0;
+                    }
+                    
+                    // Show/hide navigation arrows based on group size
+                    updateNavigationArrows();
+                    
+                    // Load the image
+                    loadCurrentImage(data);
+                })
+                .catch(err => {
+                    console.error('Error fetching recipe data:', err);
+                    // Fallback to basic image loading
+                    loadCurrentImage(null);
+                });
+        }
+        
+        function loadCurrentImage(recipeData) {
+            const recipeIdNum = currentRecipeId;
             let imageUrl;
-            let rotationPromise;
+            let rotation = 0;
             
-            if (imageType === 'page' && pageNumber !== null) {
-                imageUrl = `/api/recipe/${recipeIdNum}/page/${pageNumber}/image`;
-                // Fetch rotation from recipe details
-                rotationPromise = fetch(`/api/recipe/${recipeIdNum}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        const page = data.pages?.find(p => p.pdf_page_number === pageNumber);
-                        return page ? page.rotation : 0;
-                    })
-                    .catch(() => 0);
-            } else if (imageType === 'dish' && dishNumber !== null) {
-                imageUrl = `/api/recipe/${recipeIdNum}/dish/${dishNumber}/image`;
-                // Fetch rotation from recipe details
-                rotationPromise = fetch(`/api/recipe/${recipeIdNum}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        const dishImg = data.dish_images?.find(d => d.image_number === dishNumber);
-                        return dishImg ? dishImg.rotation : 0;
-                    })
-                    .catch(() => 0);
+            if (currentGroupType === 'recipe' && currentImageGroup.length > 0 && currentImageIndex >= 0) {
+                const page = currentImageGroup[currentImageIndex];
+                currentPageNumber = page.pdf_page_number;
+                imageUrl = `/api/recipe/${recipeIdNum}/page/${page.pdf_page_number}/image`;
+                rotation = page.rotation || 0;
+            } else if (currentGroupType === 'dish' && currentImageGroup.length > 0 && currentImageIndex >= 0) {
+                const dishImg = currentImageGroup[currentImageIndex];
+                currentDishNumber = dishImg.image_number;
+                imageUrl = `/api/recipe/${recipeIdNum}/dish/${dishImg.image_number}/image`;
+                rotation = dishImg.rotation || 0;
             } else {
                 // Default to recipe page 1
                 imageUrl = `/api/recipe/${recipeIdNum}/image`;
-                rotationPromise = fetch(`/api/recipes`)
-                    .then(response => response.json())
-                    .then(data => {
-                        const recipe = data.recipes.find(r => r.id === recipeIdNum);
-                        return recipe && recipe.rotation !== undefined ? parseInt(recipe.rotation, 10) || 0 : 0;
-                    })
-                    .catch(() => 0);
+                if (recipeData) {
+                    const page = recipeData.pages?.[0];
+                    rotation = page ? (page.rotation || 0) : 0;
+                }
             }
             
-            rotationPromise.then(rotation => {
-                currentRotation = rotation;
-                updateRotationDisplay();
-                updateImageRotation();
-                
-                previewImage.onerror = function() {
-                    this.onerror = null;
-                    this.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="400"%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dominant-baseline="middle" fill="%23ccc" font-size="20"%3ENo Image Available%3C/text%3E%3C/svg%3E';
-                    console.error('Failed to load image:', imageUrl);
-                };
-                previewImage.src = imageUrl;
-                imageOverlay.classList.add('active');
-            }).catch(err => {
-                console.error('Error fetching rotation:', err);
-                currentRotation = 0;
-                updateRotationDisplay();
-                updateImageRotation();
-                
-                previewImage.onerror = function() {
-                    this.onerror = null;
-                    this.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="400"%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dominant-baseline="middle" fill="%23ccc" font-size="20"%3ENo Image Available%3C/text%3E%3C/svg%3E';
-                    console.error('Failed to load image:', imageUrl);
-                };
-                previewImage.src = imageUrl;
-                imageOverlay.classList.add('active');
-            });
+            currentRotation = rotation;
+            updateRotationDisplay();
+            updateImageRotation();
+            
+            previewImage.onerror = function() {
+                this.onerror = null;
+                this.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="400"%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dominant-baseline="middle" fill="%23ccc" font-size="20"%3ENo Image Available%3C/text%3E%3C/svg%3E';
+                console.error('Failed to load image:', imageUrl);
+            };
+            previewImage.src = imageUrl;
+            imageOverlay.classList.add('active');
+        }
+        
+        function updateNavigationArrows() {
+            const leftArrow = document.getElementById('imageNavLeft');
+            const rightArrow = document.getElementById('imageNavRight');
+            
+            if (currentImageGroup.length > 1) {
+                // Always show both arrows when there are multiple images (wrapping enabled)
+                leftArrow.style.display = 'flex';
+                rightArrow.style.display = 'flex';
+            } else {
+                leftArrow.style.display = 'none';
+                rightArrow.style.display = 'none';
+            }
+        }
+        
+        function navigateImage(direction) {
+            if (currentImageGroup.length <= 1) return;
+            
+            if (direction === 'next') {
+                currentImageIndex = (currentImageIndex + 1) % currentImageGroup.length; // Wrap around
+            } else if (direction === 'prev') {
+                currentImageIndex = (currentImageIndex - 1 + currentImageGroup.length) % currentImageGroup.length; // Wrap around
+            }
+            
+            // Reload recipe data to get fresh rotation values
+            fetch(`/api/recipe/${currentRecipeId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (currentGroupType === 'recipe') {
+                        currentImageGroup = data.pages || [];
+                    } else if (currentGroupType === 'dish') {
+                        currentImageGroup = data.dish_images || [];
+                    }
+                    updateNavigationArrows();
+                    loadCurrentImage(data);
+                })
+                .catch(err => {
+                    console.error('Error fetching recipe data:', err);
+                    updateNavigationArrows();
+                    loadCurrentImage(null);
+                });
         }
 
         function updateRotationDisplay() {
@@ -1662,7 +1832,43 @@
             currentImageType = null;
             currentPageNumber = null;
             currentDishNumber = null;
+            currentImageIndex = 0;
+            currentImageGroup = [];
+            currentGroupType = null;
+            document.getElementById('imageNavLeft').style.display = 'none';
+            document.getElementById('imageNavRight').style.display = 'none';
         }
+        
+        // Navigation arrow click handlers
+        const imageNavLeft = document.getElementById('imageNavLeft');
+        const imageNavRight = document.getElementById('imageNavRight');
+        
+        if (imageNavLeft) {
+            imageNavLeft.addEventListener('click', function(e) {
+                e.stopPropagation();
+                navigateImage('prev');
+            });
+        }
+        
+        if (imageNavRight) {
+            imageNavRight.addEventListener('click', function(e) {
+                e.stopPropagation();
+                navigateImage('next');
+            });
+        }
+        
+        // Keyboard navigation
+        document.addEventListener('keydown', function(e) {
+            if (imageOverlay.classList.contains('active')) {
+                if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    navigateImage('prev');
+                } else if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    navigateImage('next');
+                }
+            }
+        });
 
         // Close overlay when clicking close button, overlay background, or pressing Escape
         imageOverlayClose.addEventListener('click', hideImagePreview);
