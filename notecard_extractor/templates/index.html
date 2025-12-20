@@ -781,6 +781,11 @@
                 <div id="recipeCount" class="file-count" style="display: none;">0 Recipes</div>
             </div>
 
+            <div style="margin: 15px 20px; padding: 15px; background: #f8f8f8; border-radius: 8px; border: 1px solid #e0e0e0;">
+                <label for="recipeFilter" style="display: block; margin-bottom: 8px; font-weight: 600; color: #333;">Filter by Title:</label>
+                <input type="text" id="recipeFilter" placeholder="Type to filter recipes by title..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; box-sizing: border-box;">
+            </div>
+
             <div id="viewLoading" class="loading" style="display: none;">
                 Loading recipes...
             </div>
@@ -1101,6 +1106,42 @@
         const recipesTableBody = document.getElementById('recipesTableBody');
         const recipeCount = document.getElementById('recipeCount');
         const viewEmptyState = document.getElementById('viewEmptyState');
+        const recipeFilter = document.getElementById('recipeFilter');
+        
+        // Store all recipes for filtering
+        let allRecipes = [];
+
+        // Fuzzy match function - checks if search string appears in order in the target string
+        function fuzzyMatch(search, target) {
+            if (!search || search.trim() === '') return true;
+            if (!target) return false;
+            
+            const searchLower = search.toLowerCase().trim();
+            const targetLower = target.toLowerCase();
+            
+            // Simple substring match
+            if (targetLower.includes(searchLower)) return true;
+            
+            // Fuzzy match: check if all characters in search appear in order in target
+            let searchIndex = 0;
+            for (let i = 0; i < targetLower.length && searchIndex < searchLower.length; i++) {
+                if (targetLower[i] === searchLower[searchIndex]) {
+                    searchIndex++;
+                }
+            }
+            return searchIndex === searchLower.length;
+        }
+
+        function filterRecipes(recipes, filterText) {
+            if (!filterText || filterText.trim() === '') {
+                return recipes;
+            }
+            
+            return recipes.filter(recipe => {
+                const title = recipe.title || recipe.pdf_filename || '';
+                return fuzzyMatch(filterText, title);
+            });
+        }
 
         async function loadRecipes() {
             viewLoading.style.display = 'block';
@@ -1116,13 +1157,29 @@
                     throw new Error(data.error || 'Failed to load recipes');
                 }
 
-                displayRecipes(data.recipes);
+                // Store all recipes
+                allRecipes = data.recipes;
+                
+                // Apply current filter if any
+                const filterText = recipeFilter ? recipeFilter.value : '';
+                const filteredRecipes = filterRecipes(allRecipes, filterText);
+                
+                displayRecipes(filteredRecipes);
             } catch (error) {
                 viewError.textContent = 'Error loading recipes: ' + error.message;
                 viewError.style.display = 'block';
             } finally {
                 viewLoading.style.display = 'none';
             }
+        }
+        
+        // Add filter event listener
+        if (recipeFilter) {
+            recipeFilter.addEventListener('input', function() {
+                const filterText = this.value;
+                const filteredRecipes = filterRecipes(allRecipes, filterText);
+                displayRecipes(filteredRecipes);
+            });
         }
 
         async function displayRecipes(recipes) {
