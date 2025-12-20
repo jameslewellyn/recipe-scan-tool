@@ -148,7 +148,14 @@ def autocrop_grey_border(
 
     # Scan from left edge inward until we find a column with non-margin content
     left = 0
-    scan_limit = min(int(width * 0.5), 1000)  # Scan up to 50% of width or 1000px
+    # Ensure we scan at least 50% of width from the left edge to catch left borders
+    # Same algorithm as right side, just starting from left and moving right
+    min_scan_distance = min(
+        int(width * 0.5), 1000
+    )  # Always scan at least 50% from left edge (or 1000px)
+    scan_limit = min_scan_distance  # Maximum distance to scan from left edge
+
+    # Scan from left edge, ensuring we check at least 50% from left
     for x in range(scan_limit):
         # Check if this column has only margin color (within tolerance)
         all_margin = True
@@ -170,9 +177,19 @@ def autocrop_grey_border(
 
     # Scan from right edge inward until we find a column with non-margin content
     right = width
-    scan_start = max(
-        left + int(width * 0.1), int(width * 0.5)
-    )  # Start from middle or left boundary
+    # Ensure we scan at least 50% of width from the right edge to catch right borders
+    # scan_start is where we STOP scanning (exclusive), so smaller = scan more from right
+    min_scan_distance = int(width * 0.5)  # Always scan at least 50% from right edge
+    max_scan_start = (
+        width - min_scan_distance
+    )  # Maximum scan_start to ensure we scan enough
+
+    # Don't scan past left content, but ensure we scan at least 50% from right
+    # Use the smaller (more leftward) value to scan more from right edge
+    scan_start = min(
+        max(left + int(width * 0.1), 0),  # Don't scan past left content
+        max_scan_start,  # But ensure we scan at least 50% from right
+    )
     for x in range(width - 1, scan_start - 1, -1):
         # Check if this column has only margin color (within tolerance)
         all_margin = True
@@ -191,6 +208,9 @@ def autocrop_grey_border(
             # Found content, stop here (content extends to x+1)
             right = x + 1
             break
+
+    # Debug: Print border detection results
+    # print(f"Left border: {left}px, Right border: {width - right}px, Content width: {right - left}px")
 
     # If no margins found or content is too narrow, return original
     if left >= right or right - left < width * 0.1:
