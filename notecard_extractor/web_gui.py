@@ -75,8 +75,13 @@ def extract_and_process_image_from_pdf(
                     # Remove white border
                     image = autocrop_white_border(image, threshold=250)
 
-                    # Remove grey border
-                    image = autocrop_grey_border(image, border_color=None, tolerance=60)
+                    # Remove grey borders (left and right)
+                    image = autocrop_grey_border(
+                        image, border_color=None, tolerance=60, sides="left"
+                    )
+                    image = autocrop_grey_border(
+                        image, border_color=None, tolerance=60, sides="right"
+                    )
 
                     # Convert processed image to bytes (PNG format)
                     image_bytes = io.BytesIO()

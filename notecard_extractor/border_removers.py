@@ -220,8 +220,13 @@ def grey_border_remover(
                 elif img.mode != "RGB":
                     img = img.convert("RGB")
 
-                # Crop grey borders
-                cropped_img = autocrop_grey_border(img, border_color, tolerance)
+                # Crop grey borders (left and right)
+                cropped_img = autocrop_grey_border(
+                    img, border_color, tolerance, sides="left"
+                )
+                cropped_img = autocrop_grey_border(
+                    cropped_img, border_color, tolerance, sides="right"
+                )
 
                 # Save the cropped image
                 output_path = output_folder / image_file.name
