@@ -152,11 +152,8 @@ def autocrop_grey_border(
 
     if side == "left":
         # Scan from left edge inward until we find a column with non-margin content
-        # Ensure we scan at least 50% of width from the left edge to catch left borders
-        min_scan_distance = min(
-            int(width * 0.5), 1000
-        )  # Always scan at least 50% from left edge (or 1000px)
-        scan_limit = min_scan_distance  # Maximum distance to scan from left edge
+        # Scan 50% of image width to catch left borders
+        scan_limit = int(width * 0.5)  # Scan 50% from left edge
 
         left = 0
         # Scan from left edge, ensuring we check at least 50% from left
@@ -188,11 +185,11 @@ def autocrop_grey_border(
 
     elif side == "right":
         # Scan from right edge inward until we find a column with non-margin content
-        # Ensure we scan at least 50% of width from the right edge to catch right borders
-        min_scan_distance = int(width * 0.5)  # Always scan at least 50% from right edge
+        # Scan 50% of image width from the right edge to catch right borders
+        min_scan_distance = int(width * 0.5)  # Scan 50% from right edge
         max_scan_start = (
             width - min_scan_distance
-        )  # Maximum scan_start to ensure we scan enough
+        )  # Maximum scan_start to ensure we scan 50%
 
         right = width
         scan_start = max_scan_start
@@ -249,9 +246,8 @@ def autocrop_grey_border(
         else:
             top_margin_color = border_color if border_color else (240, 240, 240)
 
-        # Ensure we scan at least 50% of height from the top edge
-        min_scan_distance = min(int(height * 0.5), 1000)
-        scan_limit = min_scan_distance
+        # Scan 50% of image height from the top edge
+        scan_limit = int(height * 0.5)
 
         top = 0
         for y in range(scan_limit):
@@ -304,7 +300,7 @@ def autocrop_grey_border(
         else:
             bottom_margin_color = border_color if border_color else (240, 240, 240)
 
-        # Ensure we scan at least 50% of height from the bottom edge
+        # Scan 50% of image height from the bottom edge
         min_scan_distance = int(height * 0.5)
         max_scan_start = height - min_scan_distance
 
