@@ -294,7 +294,7 @@
         }
 
         .recipes-table tr.expandable {
-            cursor: pointer;
+            cursor: default;
         }
 
         .recipes-table tr.expanded {
@@ -418,6 +418,24 @@
         .state-column {
             width: 150px;
             text-align: center;
+        }
+
+        .admin-column {
+            width: 80px;
+            text-align: center;
+        }
+
+        .admin-gear-icon {
+            cursor: pointer;
+            font-size: 1.2em;
+            color: #667eea;
+            transition: transform 0.2s, color 0.2s;
+            display: inline-block;
+        }
+
+        .admin-gear-icon:hover {
+            transform: scale(1.2) rotate(15deg);
+            color: #764ba2;
         }
 
         .state-badge {
@@ -566,6 +584,18 @@
             margin: auto;
         }
 
+        .image-overlay-title {
+            font-size: 1.5em;
+            font-weight: 600;
+            color: white;
+            margin-bottom: 20px;
+            text-align: center;
+            padding: 0 40px;
+            word-wrap: break-word;
+            max-width: 100%;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
         .rotation-controls {
             display: flex;
             gap: 20px;
@@ -709,6 +739,102 @@
             font-size: 0.95em;
             margin-top: 5px;
         }
+
+        .pagination-controls {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px 20px;
+            background: #f8f8f8;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .pagination-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .pagination-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .pagination-info {
+            color: #666;
+            font-size: 0.95em;
+        }
+
+        .pagination-select {
+            padding: 6px 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            background: white;
+            color: #333;
+            cursor: pointer;
+        }
+
+        .pagination-button {
+            padding: 6px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: white;
+            color: #333;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s, color 0.2s;
+            min-width: 40px;
+        }
+
+        .pagination-button:hover:not(:disabled) {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .pagination-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pagination-jump {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .pagination-jump input {
+            width: 60px;
+            padding: 6px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .pagination-jump button {
+            padding: 6px 12px;
+            border: 1px solid #667eea;
+            border-radius: 4px;
+            background: #667eea;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+            font-family: inherit;
+        }
+
+        .pagination-jump button:hover {
+            background: #5568d3;
+        }
     </style>
 </head>
 <body>
@@ -793,6 +919,32 @@
             <div id="viewError" class="error" style="display: none;"></div>
 
             <div id="recipesTableContainer" style="display: none;">
+                <!-- Top Pagination Controls -->
+                <div id="paginationTop" class="pagination-controls" style="display: none;">
+                    <div class="pagination-left">
+                        <label for="pageSizeSelect" style="color: #666; font-size: 0.95em;">Items per page:</label>
+                        <select id="pageSizeSelect" class="pagination-select">
+                            <option value="10">10</option>
+                            <option value="25">25</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                        <span id="paginationInfoTop" class="pagination-info"></span>
+                    </div>
+                    <div class="pagination-right">
+                        <button id="firstPageBtn" class="pagination-button" title="First page">««</button>
+                        <button id="prevPageBtn" class="pagination-button" title="Previous page">‹</button>
+                        <div class="pagination-jump">
+                            <span style="color: #666; font-size: 0.95em;">Page:</span>
+                            <input type="number" id="pageJumpInput" min="1" value="1" style="width: 60px;">
+                            <span id="totalPagesSpan" style="color: #666; font-size: 0.95em;">of 1</span>
+                            <button id="pageJumpBtn">Go</button>
+                        </div>
+                        <button id="nextPageBtn" class="pagination-button" title="Next page">›</button>
+                        <button id="lastPageBtn" class="pagination-button" title="Last page">»»</button>
+                    </div>
+                </div>
+
                 <table class="recipes-table">
                     <thead>
                         <tr>
@@ -801,12 +953,39 @@
                             <th class="timestamp-column">Upload Date/Time</th>
                             <th class="filename-column">Title/PDF Filename</th>
                             <th class="state-column">State</th>
+                            <th class="admin-column">Admin</th>
                         </tr>
                     </thead>
                     <tbody id="recipesTableBody">
                         <!-- Recipes will be inserted here -->
                     </tbody>
                 </table>
+
+                <!-- Bottom Pagination Controls -->
+                <div id="paginationBottom" class="pagination-controls" style="display: none;">
+                    <div class="pagination-left">
+                        <label for="pageSizeSelectBottom" style="color: #666; font-size: 0.95em;">Items per page:</label>
+                        <select id="pageSizeSelectBottom" class="pagination-select">
+                            <option value="10">10</option>
+                            <option value="25">25</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                        <span id="paginationInfoBottom" class="pagination-info"></span>
+                    </div>
+                    <div class="pagination-right">
+                        <button id="firstPageBtnBottom" class="pagination-button" title="First page">««</button>
+                        <button id="prevPageBtnBottom" class="pagination-button" title="Previous page">‹</button>
+                        <div class="pagination-jump">
+                            <span style="color: #666; font-size: 0.95em;">Page:</span>
+                            <input type="number" id="pageJumpInputBottom" min="1" value="1" style="width: 60px;">
+                            <span id="totalPagesSpanBottom" style="color: #666; font-size: 0.95em;">of 1</span>
+                            <button id="pageJumpBtnBottom">Go</button>
+                        </div>
+                        <button id="nextPageBtnBottom" class="pagination-button" title="Next page">›</button>
+                        <button id="lastPageBtnBottom" class="pagination-button" title="Last page">»»</button>
+                    </div>
+                </div>
             </div>
 
             <div id="viewEmptyState" class="empty-state">
@@ -819,6 +998,7 @@
         <div id="imageOverlay" class="image-overlay">
             <div class="image-overlay-content">
                 <div class="image-overlay-close" id="imageOverlayClose">×</div>
+                <div class="image-overlay-title" id="imageOverlayTitle"></div>
                 <div class="image-nav-arrow image-nav-left" id="imageNavLeft" style="display: none;">‹</div>
                 <img id="previewImage" src="" alt="Recipe Preview">
                 <div class="image-nav-arrow image-nav-right" id="imageNavRight" style="display: none;">›</div>
@@ -1110,6 +1290,11 @@
         
         // Store all recipes for filtering
         let allRecipes = [];
+        
+        // Pagination state
+        let currentPage = 1;
+        let pageSize = 10;
+        let filteredRecipes = [];
 
         // Fuzzy match function - checks if search string appears in order in the target string
         function fuzzyMatch(search, target) {
@@ -1162,7 +1347,8 @@
                 
                 // Apply current filter if any
                 const filterText = recipeFilter ? recipeFilter.value : '';
-                const filteredRecipes = filterRecipes(allRecipes, filterText);
+                filteredRecipes = filterRecipes(allRecipes, filterText);
+                currentPage = 1; // Reset to first page when loading
                 
                 displayRecipes(filteredRecipes);
             } catch (error) {
@@ -1177,7 +1363,8 @@
         if (recipeFilter) {
             recipeFilter.addEventListener('input', function() {
                 const filterText = this.value;
-                const filteredRecipes = filterRecipes(allRecipes, filterText);
+                filteredRecipes = filterRecipes(allRecipes, filterText);
+                currentPage = 1; // Reset to first page when filtering
                 displayRecipes(filteredRecipes);
             });
         }
@@ -1190,17 +1377,34 @@
                 viewEmptyState.style.display = 'block';
                 recipesTableContainer.style.display = 'none';
                 recipeCount.style.display = 'none';
+                document.getElementById('paginationTop').style.display = 'none';
+                document.getElementById('paginationBottom').style.display = 'none';
                 return;
             }
 
+            // Calculate pagination
+            const totalPages = Math.max(1, Math.ceil(recipes.length / pageSize));
+            if (currentPage > totalPages) {
+                currentPage = totalPages;
+            }
+            
+            const startIndex = (currentPage - 1) * pageSize;
+            const endIndex = Math.min(startIndex + pageSize, recipes.length);
+            const pageRecipes = recipes.slice(startIndex, endIndex);
+
             recipeCount.textContent = `${recipes.length} Recipe${recipes.length !== 1 ? 's' : ''}`;
             recipeCount.style.display = 'block';
+
+            // Update pagination UI
+            updatePaginationUI(recipes.length, totalPages);
 
             recipesTableBody.innerHTML = '';
             
             // First, render all rows with basic thumbnails
             const recipeRows = new Map();
-            recipes.forEach(recipe => {
+            pageRecipes.forEach((recipe, index) => {
+                // Update count to reflect actual position in full list
+                recipe.count = startIndex + index + 1;
                 // Main row
                 const row = document.createElement('tr');
                 row.className = 'expandable';
@@ -1225,6 +1429,7 @@
                     <td class="timestamp-column">${formatTimestamp(recipe.upload_timestamp)}</td>
                     <td class="filename-column">${escapeHtml(recipe.title || recipe.pdf_filename || 'Unknown')}</td>
                     <td class="state-column">${stateBadge}</td>
+                    <td class="admin-column"><span class="admin-gear-icon" data-recipe-id="${recipe.id || ''}">⚙️</span></td>
                 `;
                 row.setAttribute('data-pdf-filename', recipe.pdf_filename || '');
                 recipesTableBody.appendChild(row);
@@ -1234,24 +1439,24 @@
                 expandRow.className = 'expandable-row-content';
                 expandRow.setAttribute('data-recipe-id', recipe.id || '');
                 const expandCell = document.createElement('td');
-                expandCell.colSpan = 5; // Count, Thumbnail, Timestamp, Filename, State
+                expandCell.colSpan = 6; // Count, Thumbnail, Timestamp, Filename, State, Admin
                 expandCell.innerHTML = '<div class="detail-grid"><div class="detail-label">Loading...</div><div class="detail-value"></div></div>';
                 expandRow.appendChild(expandCell);
                 recipesTableBody.appendChild(expandRow);
 
-                // Add click handler to main row (but not to preview icon, thumbnail, or save button)
-                row.addEventListener('click', function(e) {
-                    // Don't expand if clicking on thumbnail or save button
-                    if (e.target.closest('.thumbnail-img') || e.target.closest('.save-recipe-btn')) {
-                        return;
-                    }
-                    toggleRowExpansion(recipe.id);
-                });
+                // Add click handler to gear icon only
+                const gearIcon = row.querySelector('.admin-gear-icon');
+                if (gearIcon) {
+                    gearIcon.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        toggleRowExpansion(recipe.id);
+                    });
+                }
 
             });
 
             // Now fetch all recipe details in parallel and update thumbnails
-            const recipesWithIds = recipes.filter(r => r.id);
+            const recipesWithIds = pageRecipes.filter(r => r.id);
             if (recipesWithIds.length > 0) {
                 try {
                     const recipeDetailsPromises = recipesWithIds.map(recipe => 
@@ -1365,6 +1570,116 @@
             recipesTableContainer.style.display = 'block';
             viewEmptyState.style.display = 'none';
         }
+
+        function updatePaginationUI(totalItems, totalPages) {
+            // Show pagination controls
+            document.getElementById('paginationTop').style.display = 'flex';
+            document.getElementById('paginationBottom').style.display = 'flex';
+            
+            // Update page size selects
+            document.getElementById('pageSizeSelect').value = pageSize;
+            document.getElementById('pageSizeSelectBottom').value = pageSize;
+            
+            // Update pagination info
+            const startItem = totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+            const endItem = Math.min(currentPage * pageSize, totalItems);
+            const infoText = `Showing ${startItem}-${endItem} of ${totalItems}`;
+            document.getElementById('paginationInfoTop').textContent = infoText;
+            document.getElementById('paginationInfoBottom').textContent = infoText;
+            
+            // Update page jump inputs and total pages
+            document.getElementById('pageJumpInput').value = currentPage;
+            document.getElementById('pageJumpInput').max = totalPages;
+            document.getElementById('pageJumpInputBottom').value = currentPage;
+            document.getElementById('pageJumpInputBottom').max = totalPages;
+            document.getElementById('totalPagesSpan').textContent = `of ${totalPages}`;
+            document.getElementById('totalPagesSpanBottom').textContent = `of ${totalPages}`;
+            
+            // Update button states
+            const isFirstPage = currentPage === 1;
+            const isLastPage = currentPage === totalPages;
+            
+            // Top buttons
+            document.getElementById('firstPageBtn').disabled = isFirstPage;
+            document.getElementById('prevPageBtn').disabled = isFirstPage;
+            document.getElementById('nextPageBtn').disabled = isLastPage;
+            document.getElementById('lastPageBtn').disabled = isLastPage;
+            
+            // Bottom buttons
+            document.getElementById('firstPageBtnBottom').disabled = isFirstPage;
+            document.getElementById('prevPageBtnBottom').disabled = isFirstPage;
+            document.getElementById('nextPageBtnBottom').disabled = isLastPage;
+            document.getElementById('lastPageBtnBottom').disabled = isLastPage;
+        }
+
+        function goToPage(page) {
+            const totalPages = Math.max(1, Math.ceil(filteredRecipes.length / pageSize));
+            if (page >= 1 && page <= totalPages) {
+                currentPage = page;
+                displayRecipes(filteredRecipes);
+                // Scroll to top of table
+                document.getElementById('recipesTableContainer').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+
+        function changePageSize(newSize) {
+            pageSize = parseInt(newSize, 10);
+            const totalPages = Math.max(1, Math.ceil(filteredRecipes.length / pageSize));
+            if (currentPage > totalPages) {
+                currentPage = totalPages;
+            }
+            displayRecipes(filteredRecipes);
+        }
+
+        // Pagination event handlers
+        document.getElementById('firstPageBtn').addEventListener('click', () => goToPage(1));
+        document.getElementById('prevPageBtn').addEventListener('click', () => goToPage(currentPage - 1));
+        document.getElementById('nextPageBtn').addEventListener('click', () => goToPage(currentPage + 1));
+        document.getElementById('lastPageBtn').addEventListener('click', () => {
+            const totalPages = Math.max(1, Math.ceil(filteredRecipes.length / pageSize));
+            goToPage(totalPages);
+        });
+
+        document.getElementById('firstPageBtnBottom').addEventListener('click', () => goToPage(1));
+        document.getElementById('prevPageBtnBottom').addEventListener('click', () => goToPage(currentPage - 1));
+        document.getElementById('nextPageBtnBottom').addEventListener('click', () => goToPage(currentPage + 1));
+        document.getElementById('lastPageBtnBottom').addEventListener('click', () => {
+            const totalPages = Math.max(1, Math.ceil(filteredRecipes.length / pageSize));
+            goToPage(totalPages);
+        });
+
+        document.getElementById('pageSizeSelect').addEventListener('change', function() {
+            changePageSize(this.value);
+        });
+
+        document.getElementById('pageSizeSelectBottom').addEventListener('change', function() {
+            changePageSize(this.value);
+        });
+
+        document.getElementById('pageJumpBtn').addEventListener('click', function() {
+            const page = parseInt(document.getElementById('pageJumpInput').value, 10);
+            goToPage(page);
+        });
+
+        document.getElementById('pageJumpBtnBottom').addEventListener('click', function() {
+            const page = parseInt(document.getElementById('pageJumpInputBottom').value, 10);
+            goToPage(page);
+        });
+
+        // Allow Enter key in page jump inputs
+        document.getElementById('pageJumpInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                const page = parseInt(this.value, 10);
+                goToPage(page);
+            }
+        });
+
+        document.getElementById('pageJumpInputBottom').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                const page = parseInt(this.value, 10);
+                goToPage(page);
+            }
+        });
 
         function formatTimestamp(timestamp) {
             if (!timestamp) return 'Unknown';
@@ -1784,6 +2099,7 @@
         const imageOverlay = document.getElementById('imageOverlay');
         const previewImage = document.getElementById('previewImage');
         const imageOverlayClose = document.getElementById('imageOverlayClose');
+        const imageOverlayTitle = document.getElementById('imageOverlayTitle');
         const rotateClockwise = document.getElementById('rotateClockwise');
         const rotateCounterClockwise = document.getElementById('rotateCounterClockwise');
         const rotationDisplay = document.getElementById('rotationDisplay');
@@ -1853,6 +2169,19 @@
             const recipeIdNum = currentRecipeId;
             let imageUrl;
             let rotation = 0;
+            
+            // Update title if recipeData is available
+            if (recipeData && recipeData.title) {
+                imageOverlayTitle.textContent = recipeData.title;
+                imageOverlayTitle.style.display = 'block';
+            } else if (recipeData && recipeData.pdf_filename) {
+                // Fallback to PDF filename if no title
+                imageOverlayTitle.textContent = recipeData.pdf_filename;
+                imageOverlayTitle.style.display = 'block';
+            } else {
+                imageOverlayTitle.textContent = '';
+                imageOverlayTitle.style.display = 'none';
+            }
             
             console.log('loadCurrentImage called:', {
                 currentGroupType,
