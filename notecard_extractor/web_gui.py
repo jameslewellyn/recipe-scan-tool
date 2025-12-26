@@ -14,7 +14,7 @@ from datetime import datetime
 from pypdf import PdfReader
 from PIL import Image
 from sqlmodel import SQLModel, create_engine, Session
-from notecard_extractor.database import Recipe, RecipeState, RecipeImage, DishImage
+from notecard_extractor.database import Recipe, RecipeState, RecipeImage, DishImage, RecipeTagList, RecipeTag
 from notecard_extractor.image_processing import (
     autocrop_white_border,
     autocrop_grey_border,
@@ -370,6 +370,22 @@ def get_recipe(recipe_id: int):
                 .all()
             )
 
+            # Get all tags for this recipe
+            recipe_tags = (
+                session.query(RecipeTag, RecipeTagList)
+                .join(RecipeTagList, RecipeTag.tag_id == RecipeTagList.id)
+                .filter(RecipeTag.recipe_id == recipe_id)
+                .all()
+            )
+            
+            tags_list = []
+            for recipe_tag, tag_list in recipe_tags:
+                tags_list.append({
+                    "id": tag_list.id,
+                    "tag_name": tag_list.tag_name,
+                    "recipe_tag_id": recipe_tag.id
+                })
+
             # Build list of all pages
             pages = []
             for img in recipe_images:
@@ -457,6 +473,7 @@ def get_recipe(recipe_id: int):
                 "total_pages": len(pages),
                 "dish_images": dish_images_list,
                 "total_dish_images": len(dish_images_list),
+                "tags": tags_list,
             }
 
             return jsonify(result)
@@ -892,6 +909,108 @@ def update_recipe(recipe_id: int):
             session.commit()
 
             return jsonify({"success": True, "message": "Recipe updated successfully"})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@flask_app.route("/api/recipe/<int:recipe_id>/tags", methods=["POST"])
+def add_recipe_tag(recipe_id: int):
+    """
+    Add a tag to a recipe.
+    Expects JSON with: tag_name
+    Creates the tag in RecipeTagList if it doesn't exist, then links it to the recipe.
+    """
+    if db_engine is None:
+        return jsonify({"error": "Database not initialized"}), 500
+
+    try:
+        data = request.get_json()
+        if not data or "tag_name" not in data:
+            return jsonify({"error": "tag_name is required"}), 400
+
+        tag_name = data["tag_name"].strip()
+        if not tag_name:
+            return jsonify({"error": "tag_name cannot be empty"}), 400
+
+        with Session(db_engine) as session:
+            # Check if recipe exists
+            recipe = session.get(Recipe, recipe_id)
+            if not recipe:
+                return jsonify({"error": "Recipe not found"}), 404
+
+            # Find or create the tag in RecipeTagList
+            tag_list = (
+                session.query(RecipeTagList)
+                .filter(RecipeTagList.tag_name == tag_name)
+                .first()
+            )
+
+            if not tag_list:
+                # Create new tag
+                tag_list = RecipeTagList(tag_name=tag_name)
+                session.add(tag_list)
+                session.flush()  # Get the ID without committing
+
+            # Check if tag is already assigned to this recipe
+            existing_recipe_tag = (
+                session.query(RecipeTag)
+                .filter(RecipeTag.recipe_id == recipe_id)
+                .filter(RecipeTag.tag_id == tag_list.id)
+                .first()
+            )
+
+            if existing_recipe_tag:
+                return jsonify({"error": "Tag already assigned to this recipe"}), 400
+
+            # Create the link
+            recipe_tag = RecipeTag(recipe_id=recipe_id, tag_id=tag_list.id)
+            session.add(recipe_tag)
+            session.commit()
+
+            return jsonify({
+                "success": True,
+                "tag": {
+                    "id": tag_list.id,
+                    "tag_name": tag_list.tag_name,
+                    "recipe_tag_id": recipe_tag.id
+                }
+            })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@flask_app.route("/api/recipe/<int:recipe_id>/tags/<int:recipe_tag_id>", methods=["DELETE"])
+def remove_recipe_tag(recipe_id: int, recipe_tag_id: int):
+    """
+    Remove a tag from a recipe.
+    """
+    if db_engine is None:
+        return jsonify({"error": "Database not initialized"}), 500
+
+    try:
+        with Session(db_engine) as session:
+            # Check if recipe exists
+            recipe = session.get(Recipe, recipe_id)
+            if not recipe:
+                return jsonify({"error": "Recipe not found"}), 404
+
+            # Find the recipe tag link
+            recipe_tag = (
+                session.query(RecipeTag)
+                .filter(RecipeTag.id == recipe_tag_id)
+                .filter(RecipeTag.recipe_id == recipe_id)
+                .first()
+            )
+
+            if not recipe_tag:
+                return jsonify({"error": "Tag not found for this recipe"}), 404
+
+            session.delete(recipe_tag)
+            session.commit()
+
+            return jsonify({"success": True})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500

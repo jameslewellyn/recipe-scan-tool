@@ -835,6 +835,86 @@
         .pagination-jump button:hover {
             background: #5568d3;
         }
+
+        .tags-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            min-height: 40px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background: white;
+        }
+
+        .tag-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 500;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .tag-chip:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+        }
+
+        .tag-remove {
+            cursor: pointer;
+            font-size: 1.1em;
+            line-height: 1;
+            opacity: 0.8;
+            transition: opacity 0.2s;
+            padding: 0;
+            background: none;
+            border: none;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+        }
+
+        .tag-remove:hover {
+            opacity: 1;
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .tag-input-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .tag-input {
+            flex: 1;
+            padding: 6px 12px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            font-size: 0.9em;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .tag-input:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .tag-input::placeholder {
+            color: #999;
+        }
     </style>
 </head>
 <body>
@@ -1697,6 +1777,98 @@
             return div.innerHTML;
         }
 
+        function renderTags(tags) {
+            if (!tags || tags.length === 0) {
+                return '';
+            }
+            return tags.map(tag => `
+                <span class="tag-chip" data-tag-id="${tag.id}" data-recipe-tag-id="${tag.recipe_tag_id}">
+                    ${escapeHtml(tag.tag_name)}
+                    <button class="tag-remove" onclick="removeTag(${tag.recipe_tag_id}, ${tag.id})" title="Remove tag">×</button>
+                </span>
+            `).join('');
+        }
+
+        async function addTag(recipeId, tagName) {
+            if (!tagName || !tagName.trim()) {
+                return;
+            }
+
+            const tagInput = document.getElementById(`tag-input-${recipeId}`);
+            const tagsContainer = document.getElementById(`tags-container-${recipeId}`);
+            
+            // Disable input while adding
+            tagInput.disabled = true;
+            tagInput.value = '';
+
+            try {
+                const response = await fetch(`/api/recipe/${recipeId}/tags`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ tag_name: tagName.trim() })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+                    throw new Error(errorData.error || 'Failed to add tag');
+                }
+
+                const result = await response.json();
+                
+                // Add the new tag chip before the input wrapper
+                const inputWrapper = tagsContainer.querySelector('.tag-input-wrapper');
+                const newTagChip = document.createElement('span');
+                newTagChip.className = 'tag-chip';
+                newTagChip.setAttribute('data-tag-id', result.tag.id);
+                newTagChip.setAttribute('data-recipe-tag-id', result.tag.recipe_tag_id);
+                newTagChip.innerHTML = `
+                    ${escapeHtml(result.tag.tag_name)}
+                    <button class="tag-remove" onclick="removeTag(${result.tag.recipe_tag_id}, ${result.tag.id})" title="Remove tag">×</button>
+                `;
+                tagsContainer.insertBefore(newTagChip, inputWrapper);
+            } catch (error) {
+                console.error('Error adding tag:', error);
+                alert('Failed to add tag: ' + error.message);
+                tagInput.value = tagName; // Restore the value on error
+            } finally {
+                tagInput.disabled = false;
+                tagInput.focus();
+            }
+        }
+
+        async function removeTag(recipeTagId, tagId) {
+            const tagChip = document.querySelector(`.tag-chip[data-recipe-tag-id="${recipeTagId}"]`);
+            if (!tagChip) return;
+
+            const recipeId = tagChip.closest('.tags-container').getAttribute('data-recipe-id');
+            
+            // Remove from UI immediately for better UX
+            tagChip.style.opacity = '0.5';
+            tagChip.style.pointerEvents = 'none';
+
+            try {
+                const response = await fetch(`/api/recipe/${recipeId}/tags/${recipeTagId}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+                    throw new Error(errorData.error || 'Failed to remove tag');
+                }
+
+                // Remove from DOM
+                tagChip.remove();
+            } catch (error) {
+                console.error('Error removing tag:', error);
+                alert('Failed to remove tag: ' + error.message);
+                // Restore UI on error
+                tagChip.style.opacity = '1';
+                tagChip.style.pointerEvents = 'auto';
+            }
+        }
+
         function getStateInfo(state) {
             const stateMap = {
                 'not_started': { emoji: '⏳', label: 'Not Started' },
@@ -1817,6 +1989,16 @@
                         <div class="detail-label">Notes:</div>
                         <div class="detail-value">
                             <textarea class="editable-field" data-field="notes" placeholder="Not set" style="width: 100%; padding: 5px; border: 1px solid #ddd; border-radius: 4px; min-height: 60px; resize: vertical;">${escapeHtml(data.notes || '')}</textarea>
+                        </div>
+                        
+                        <div class="detail-label">Tags:</div>
+                        <div class="detail-value">
+                            <div class="tags-container" id="tags-container-${recipeId}" data-recipe-id="${recipeId}">
+                                ${renderTags(data.tags || [])}
+                                <div class="tag-input-wrapper">
+                                    <input type="text" class="tag-input" id="tag-input-${recipeId}" placeholder="Type a tag and press Enter..." data-recipe-id="${recipeId}">
+                                </div>
+                            </div>
                         </div>
                         
                         <div class="detail-label">Total Pages:</div>
@@ -1972,6 +2154,20 @@
                             }
                         });
                     });
+                    
+                    // Add event handler for tag input
+                    const tagInput = document.getElementById(`tag-input-${recipeId}`);
+                    if (tagInput) {
+                        tagInput.addEventListener('keydown', function(e) {
+                            if (e.key === 'Enter') {
+                                e.preventDefault();
+                                const tagName = this.value.trim();
+                                if (tagName) {
+                                    addTag(recipeId, tagName);
+                                }
+                            }
+                        });
+                    }
                 } catch (error) {
                     console.error('Error loading recipe details:', error);
                     detailGrid.innerHTML = `

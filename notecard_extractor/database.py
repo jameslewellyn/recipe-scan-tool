@@ -6,7 +6,7 @@ Uses SQLModel to define the database schema.
 
 from enum import Enum
 from sqlmodel import SQLModel, Field, Column
-from sqlalchemy import LargeBinary, DateTime
+from sqlalchemy import LargeBinary, DateTime, UniqueConstraint
 from typing import Optional
 from datetime import datetime
 
@@ -130,3 +130,37 @@ class DishImage(SQLModel, table=True):
     medium_image_sha256: Optional[str] = Field(default=None, index=True, max_length=64)
     thumbnail_data: Optional[bytes] = Field(default=None, sa_column=Column(LargeBinary))
     thumbnail_sha256: Optional[str] = Field(default=None, index=True, max_length=64)
+
+
+class RecipeTagList(SQLModel, table=True):
+    """
+    RecipeTagList table model.
+    Stores the list of available tags that can be assigned to recipes.
+    """
+
+    __table_args__ = (UniqueConstraint("tag_name"),)
+
+    # Primary key
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    # Tag name (must be unique)
+    tag_name: str = Field(index=True, max_length=100, unique=True)
+
+
+class RecipeTag(SQLModel, table=True):
+    """
+    RecipeTag table model.
+    Junction table linking recipes to tags (many-to-many relationship).
+    Each recipe can have many tags, and each tag can be assigned to many recipes.
+    """
+
+    __table_args__ = (UniqueConstraint("recipe_id", "tag_id"),)
+
+    # Primary key
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    # Foreign key to Recipe
+    recipe_id: int = Field(foreign_key="recipe.id", index=True)
+
+    # Foreign key to RecipeTagList
+    tag_id: int = Field(foreign_key="recipetaglist.id", index=True)

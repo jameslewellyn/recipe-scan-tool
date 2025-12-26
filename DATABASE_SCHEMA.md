@@ -67,9 +67,42 @@ Stores dish images associated with recipes. Each recipe can have multiple dish i
 
 ---
 
+## Table 4: `recipetaglist`
+
+Stores the list of available tags that can be assigned to recipes.
+
+### Columns:
+
+| Column Name | Type                  | Description                    |
+| ---------- | --------------------- | ------------------------------ |
+| `id`       | INTEGER (Primary Key) | Unique identifier for the tag  |
+| `tag_name` | VARCHAR(100) (Indexed, Unique) | The name of the tag (must be unique) |
+
+---
+
+## Table 5: `recipetag`
+
+Junction table linking recipes to tags (many-to-many relationship). Each recipe can have many tags, and each tag can be assigned to many recipes.
+
+### Columns:
+
+| Column Name | Type                                       | Description                        |
+| ----------- | ------------------------------------------ | ---------------------------------- |
+| `id`        | INTEGER (Primary Key)                      | Unique identifier for the tag link |
+| `recipe_id` | INTEGER (Foreign Key → recipe.id, Indexed) | Reference to the Recipe            |
+| `tag_id`    | INTEGER (Foreign Key → recipetaglist.id, Indexed) | Reference to the Tag            |
+
+### Constraints:
+
+- Unique constraint on (`recipe_id`, `tag_id`) to prevent duplicate tag assignments to the same recipe
+
+---
+
 ## Relationships
 
 -   **One-to-Many**: One `Recipe` can have multiple `RecipeImage` entries (one per PDF page)
 -   **One-to-Many**: One `Recipe` can have multiple `DishImage` entries
+-   **Many-to-Many**: One `Recipe` can have multiple `RecipeTag` entries, linking to multiple tags in `RecipeTagList`
+-   **Many-to-Many**: One tag in `RecipeTagList` can be assigned to multiple recipes via `RecipeTag`
 -   The web GUI displays images from `RecipeImage` where `pdf_page_number = 0` (page 1) for each recipe
 -   Rotation is stored per image in both `RecipeImage` and `DishImage` tables, allowing different rotations for different images
