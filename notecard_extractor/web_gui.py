@@ -20,6 +20,34 @@ from notecard_extractor.image_processing import (
     autocrop_grey_border,
 )
 
+
+def get_cache_headers(image_hash: Optional[str] = None) -> dict:
+    """
+    Generate HTTP caching headers for images.
+    Uses ETag based on image hash for validation.
+    """
+    headers = {
+        "Cache-Control": "public, max-age=31536000, immutable",  # 1 year cache
+    }
+    
+    if image_hash:
+        headers["ETag"] = f'"{image_hash}"'
+    
+    return headers
+
+
+def check_cache_etag(request_etag: Optional[str], image_hash: Optional[str]) -> bool:
+    """
+    Check if the client's ETag matches the image hash.
+    Returns True if cache is valid (should return 304 Not Modified).
+    """
+    if not request_etag or not image_hash:
+        return False
+    
+    # Remove quotes from ETag if present
+    request_etag = request_etag.strip('"')
+    return request_etag == image_hash
+
 # Get the directory where this module is located
 BASE_DIR = Path(__file__).parent
 
@@ -312,6 +340,22 @@ def get_recipes():
                 )
                 rotation = recipe_image.rotation if recipe_image else 0
 
+                # Get tags for this recipe
+                recipe_tags = (
+                    session.query(RecipeTag, RecipeTagList)
+                    .join(RecipeTagList, RecipeTag.tag_id == RecipeTagList.id)
+                    .filter(RecipeTag.recipe_id == recipe.id)
+                    .all()
+                )
+                
+                tags_list = []
+                for recipe_tag, tag_list in recipe_tags:
+                    tags_list.append({
+                        "id": tag_list.id,
+                        "tag_name": tag_list.tag_name,
+                        "recipe_tag_id": recipe_tag.id
+                    })
+
                 results.append(
                     {
                         "id": recipe.id,
@@ -322,6 +366,7 @@ def get_recipes():
                         "pdf_size": pdf_size,
                         "rotation": rotation,
                         "state": recipe.state.value if recipe.state else "not_started",
+                        "tags": tags_list,
                     }
                 )
 
@@ -511,13 +556,21 @@ def get_recipe_image(recipe_id: int):
                     {"error": "No processed image available for page 1"}
                 ), 404
 
+            # Check cache with ETag
+            request_etag = request.headers.get("If-None-Match")
+            image_hash = recipe_image.cropped_image_sha256
+            if check_cache_etag(request_etag, image_hash):
+                return Response(status=304)  # Not Modified
+
+            # Build headers with caching
+            headers = get_cache_headers(image_hash)
+            headers["Content-Disposition"] = f"inline; filename=recipe_{recipe_id}.png"
+
             # Return image as PNG
             return Response(
                 recipe_image.cropped_image_data,
                 mimetype="image/png",
-                headers={
-                    "Content-Disposition": f"inline; filename=recipe_{recipe_id}.png"
-                },
+                headers=headers,
             )
 
     except Exception as e:
@@ -551,13 +604,21 @@ def get_recipe_thumbnail(recipe_id: int):
             if not recipe_image or not recipe_image.thumbnail_data:
                 return jsonify({"error": "No thumbnail available for page 1"}), 404
 
+            # Check cache with ETag
+            request_etag = request.headers.get("If-None-Match")
+            image_hash = recipe_image.thumbnail_sha256
+            if check_cache_etag(request_etag, image_hash):
+                return Response(status=304)  # Not Modified
+
+            # Build headers with caching
+            headers = get_cache_headers(image_hash)
+            headers["Content-Disposition"] = f"inline; filename=recipe_{recipe_id}_thumb.png"
+
             # Return thumbnail as PNG
             return Response(
                 recipe_image.thumbnail_data,
                 mimetype="image/png",
-                headers={
-                    "Content-Disposition": f"inline; filename=recipe_{recipe_id}_thumb.png"
-                },
+                headers=headers,
             )
 
     except Exception as e:
@@ -591,13 +652,21 @@ def get_recipe_medium(recipe_id: int):
             if not recipe_image or not recipe_image.medium_image_data:
                 return jsonify({"error": "No medium image available for page 1"}), 404
 
+            # Check cache with ETag
+            request_etag = request.headers.get("If-None-Match")
+            image_hash = recipe_image.medium_image_sha256
+            if check_cache_etag(request_etag, image_hash):
+                return Response(status=304)  # Not Modified
+
+            # Build headers with caching
+            headers = get_cache_headers(image_hash)
+            headers["Content-Disposition"] = f"inline; filename=recipe_{recipe_id}_medium.png"
+
             # Return medium image as PNG
             return Response(
                 recipe_image.medium_image_data,
                 mimetype="image/png",
-                headers={
-                    "Content-Disposition": f"inline; filename=recipe_{recipe_id}_medium.png"
-                },
+                headers=headers,
             )
 
     except Exception as e:
@@ -635,13 +704,21 @@ def get_recipe_page_thumbnail(recipe_id: int, page_number: int):
                     {"error": f"No thumbnail available for page {page_number + 1}"}
                 ), 404
 
+            # Check cache with ETag
+            request_etag = request.headers.get("If-None-Match")
+            image_hash = recipe_image.thumbnail_sha256
+            if check_cache_etag(request_etag, image_hash):
+                return Response(status=304)  # Not Modified
+
+            # Build headers with caching
+            headers = get_cache_headers(image_hash)
+            headers["Content-Disposition"] = f"inline; filename=recipe_{recipe_id}_page{page_number}_thumb.png"
+
             # Return thumbnail as PNG
             return Response(
                 recipe_image.thumbnail_data,
                 mimetype="image/png",
-                headers={
-                    "Content-Disposition": f"inline; filename=recipe_{recipe_id}_page{page_number}_thumb.png"
-                },
+                headers=headers,
             )
 
     except Exception as e:
@@ -679,13 +756,21 @@ def get_recipe_page_image(recipe_id: int, page_number: int):
                     {"error": f"No image available for page {page_number + 1}"}
                 ), 404
 
+            # Check cache with ETag
+            request_etag = request.headers.get("If-None-Match")
+            image_hash = recipe_image.cropped_image_sha256
+            if check_cache_etag(request_etag, image_hash):
+                return Response(status=304)  # Not Modified
+
+            # Build headers with caching
+            headers = get_cache_headers(image_hash)
+            headers["Content-Disposition"] = f"inline; filename=recipe_{recipe_id}_page{page_number}.png"
+
             # Return image as PNG
             return Response(
                 recipe_image.cropped_image_data,
                 mimetype="image/png",
-                headers={
-                    "Content-Disposition": f"inline; filename=recipe_{recipe_id}_page{page_number}.png"
-                },
+                headers=headers,
             )
 
     except Exception as e:
@@ -723,13 +808,21 @@ def get_dish_image_thumbnail(recipe_id: int, image_number: int):
                     {"error": f"No thumbnail available for dish image {image_number}"}
                 ), 404
 
+            # Check cache with ETag
+            request_etag = request.headers.get("If-None-Match")
+            image_hash = dish_image.thumbnail_sha256
+            if check_cache_etag(request_etag, image_hash):
+                return Response(status=304)  # Not Modified
+
+            # Build headers with caching
+            headers = get_cache_headers(image_hash)
+            headers["Content-Disposition"] = f"inline; filename=recipe_{recipe_id}_dish{image_number}_thumb.png"
+
             # Return thumbnail as PNG
             return Response(
                 dish_image.thumbnail_data,
                 mimetype="image/png",
-                headers={
-                    "Content-Disposition": f"inline; filename=recipe_{recipe_id}_dish{image_number}_thumb.png"
-                },
+                headers=headers,
             )
 
     except Exception as e:
@@ -767,13 +860,21 @@ def get_dish_image(recipe_id: int, image_number: int):
                     {"error": f"No image available for dish image {image_number}"}
                 ), 404
 
+            # Check cache with ETag
+            request_etag = request.headers.get("If-None-Match")
+            image_hash = dish_image.image_sha256
+            if check_cache_etag(request_etag, image_hash):
+                return Response(status=304)  # Not Modified
+
+            # Build headers with caching
+            headers = get_cache_headers(image_hash)
+            headers["Content-Disposition"] = f"inline; filename=recipe_{recipe_id}_dish{image_number}.png"
+
             # Return image as PNG
             return Response(
                 dish_image.image_data,
                 mimetype="image/png",
-                headers={
-                    "Content-Disposition": f"inline; filename=recipe_{recipe_id}_dish{image_number}.png"
-                },
+                headers=headers,
             )
 
     except Exception as e:
@@ -1011,6 +1112,48 @@ def remove_recipe_tag(recipe_id: int, recipe_tag_id: int):
             session.commit()
 
             return jsonify({"success": True})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@flask_app.route("/api/tags", methods=["GET"])
+def get_tags_with_counts():
+    """
+    Get all tags with their recipe counts.
+    Only returns tags that have at least one associated recipe.
+    """
+    if db_engine is None:
+        return jsonify({"error": "Database not initialized"}), 500
+
+    try:
+        with Session(db_engine) as session:
+            # Get all tags with recipe counts
+            from sqlalchemy import func
+            
+            tags_with_counts = (
+                session.query(
+                    RecipeTagList.id,
+                    RecipeTagList.tag_name,
+                    func.count(RecipeTag.recipe_id).label('recipe_count')
+                )
+                .join(RecipeTag, RecipeTagList.id == RecipeTag.tag_id)
+                .group_by(RecipeTagList.id, RecipeTagList.tag_name)
+                .having(func.count(RecipeTag.recipe_id) > 0)
+                .order_by(RecipeTagList.tag_name)
+                .all()
+            )
+            
+            result = [
+                {
+                    "id": tag.id,
+                    "tag_name": tag.tag_name,
+                    "recipe_count": tag.recipe_count
+                }
+                for tag in tags_with_counts
+            ]
+            
+            return jsonify({"tags": result})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500

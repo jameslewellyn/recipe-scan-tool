@@ -915,6 +915,141 @@
         .tag-input::placeholder {
             color: #999;
         }
+
+        .tag-filter-container {
+            margin: 15px 20px;
+            padding: 15px;
+            background: #f8f8f8;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .tag-filter-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .tag-filter-title {
+            font-weight: 600;
+            color: #333;
+            font-size: 1em;
+        }
+
+        .tag-filter-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .tag-filter-btn {
+            padding: 4px 12px;
+            border: 1px solid #667eea;
+            border-radius: 4px;
+            background: white;
+            color: #667eea;
+            cursor: pointer;
+            font-size: 0.85em;
+            transition: background 0.2s, color 0.2s;
+        }
+
+        .tag-filter-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .tag-filter-dropdown {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background: white;
+            padding: 8px;
+            display: none;
+        }
+
+        .tag-filter-dropdown.active {
+            display: block;
+        }
+
+        .tag-filter-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+            color: #333;
+        }
+
+        .tag-filter-item:hover {
+            background: #f0f0f0;
+        }
+
+        .tag-filter-item-untagged {
+            border-top: 1px solid #e0e0e0;
+            margin-top: 4px;
+            padding-top: 10px;
+        }
+
+        .tag-filter-untagged-text {
+            font-weight: 600;
+        }
+
+        .tag-filter-checkbox {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: #667eea;
+        }
+
+        .tag-filter-label {
+            flex: 1;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            color: #333;
+        }
+
+        .tag-filter-count {
+            font-size: 0.85em;
+            color: #666;
+            background: #e0e0e0;
+            padding: 2px 8px;
+            border-radius: 12px;
+        }
+
+        .tag-filter-toggle {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background: white;
+            color: #333;
+            cursor: pointer;
+            font-size: 0.95em;
+            width: 100%;
+            text-align: left;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: border-color 0.2s;
+        }
+
+        .tag-filter-toggle:hover {
+            border-color: #667eea;
+        }
+
+        .tag-filter-toggle::after {
+            content: '▼';
+            font-size: 0.8em;
+            transition: transform 0.2s;
+        }
+
+        .tag-filter-toggle.active::after {
+            transform: rotate(180deg);
+        }
     </style>
 </head>
 <body>
@@ -990,6 +1125,20 @@
             <div style="margin: 15px 20px; padding: 15px; background: #f8f8f8; border-radius: 8px; border: 1px solid #e0e0e0;">
                 <label for="recipeFilter" style="display: block; margin-bottom: 8px; font-weight: 600; color: #333;">Filter by Title:</label>
                 <input type="text" id="recipeFilter" placeholder="Type to filter recipes by title..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; box-sizing: border-box;">
+            </div>
+
+            <div class="tag-filter-container">
+                <div class="tag-filter-header">
+                    <span class="tag-filter-title">Filter by Tags:</span>
+                    <div class="tag-filter-buttons">
+                        <button class="tag-filter-btn" id="selectAllTagsBtn">All</button>
+                        <button class="tag-filter-btn" id="deselectAllTagsBtn">Untagged</button>
+                    </div>
+                </div>
+                <button class="tag-filter-toggle" id="tagFilterToggle">Select tags to filter...</button>
+                <div class="tag-filter-dropdown" id="tagFilterDropdown">
+                    <!-- Tags will be loaded here -->
+                </div>
             </div>
 
             <div id="viewLoading" class="loading" style="display: none;">
@@ -1375,6 +1524,11 @@
         let currentPage = 1;
         let pageSize = 10;
         let filteredRecipes = [];
+        
+        // Tag filtering state
+        let allTags = [];
+        let selectedTagIds = new Set(); // All tags selected by default
+        let includeUntagged = true; // Include untagged recipes by default
 
         // Fuzzy match function - checks if search string appears in order in the target string
         function fuzzyMatch(search, target) {
@@ -1397,15 +1551,39 @@
             return searchIndex === searchLower.length;
         }
 
-        function filterRecipes(recipes, filterText) {
-            if (!filterText || filterText.trim() === '') {
-                return recipes;
+        function filterRecipes(recipes, filterText, selectedTagIdsSet, includeUntaggedFlag = true) {
+            let filtered = recipes;
+            
+            // Filter by title
+            if (filterText && filterText.trim() !== '') {
+                filtered = filtered.filter(recipe => {
+                    const title = recipe.title || recipe.pdf_filename || '';
+                    return fuzzyMatch(filterText, title);
+                });
             }
             
-            return recipes.filter(recipe => {
-                const title = recipe.title || recipe.pdf_filename || '';
-                return fuzzyMatch(filterText, title);
-            });
+            // Filter by tags
+            // If tags are selected, show recipes that have at least one of the selected tags
+            // Also include untagged recipes if includeUntaggedFlag is true
+            if (selectedTagIdsSet && selectedTagIdsSet.size > 0) {
+                filtered = filtered.filter(recipe => {
+                    const hasTags = recipe.tags && recipe.tags.length > 0;
+                    if (!hasTags) {
+                        return includeUntaggedFlag; // Show untagged recipes if includeUntaggedFlag is true
+                    }
+                    // Check if recipe has any of the selected tags
+                    return recipe.tags.some(tag => selectedTagIdsSet.has(tag.id));
+                });
+            } else if (selectedTagIdsSet && selectedTagIdsSet.size === 0) {
+                // No tags selected - only show untagged recipes if includeUntaggedFlag is true
+                filtered = filtered.filter(recipe => {
+                    const hasTags = recipe.tags && recipe.tags.length > 0;
+                    return !hasTags && includeUntaggedFlag;
+                });
+            }
+            // If selectedTagIdsSet is null/undefined, show all recipes (no tag filtering)
+            
+            return filtered;
         }
 
         async function loadRecipes() {
@@ -1415,19 +1593,34 @@
             viewEmptyState.style.display = 'none';
 
             try {
-                const response = await fetch('/api/recipes');
-                const data = await response.json();
+                // Load recipes and tags in parallel
+                const [recipesResponse, tagsResponse] = await Promise.all([
+                    fetch('/api/recipes'),
+                    fetch('/api/tags')
+                ]);
 
-                if (!response.ok) {
-                    throw new Error(data.error || 'Failed to load recipes');
+                const recipesData = await recipesResponse.json();
+                const tagsData = await tagsResponse.json();
+
+                if (!recipesResponse.ok) {
+                    throw new Error(recipesData.error || 'Failed to load recipes');
                 }
 
-                // Store all recipes
-                allRecipes = data.recipes;
+                // Store all recipes (tags are already included from the API)
+                allRecipes = recipesData.recipes;
+                
+                // Load and display tags
+                if (tagsData.tags) {
+                    allTags = tagsData.tags;
+                    // Select all tags by default, and include untagged
+                    selectedTagIds = new Set(allTags.map(tag => tag.id));
+                    includeUntagged = true;
+                    renderTagFilter();
+                }
                 
                 // Apply current filter if any
                 const filterText = recipeFilter ? recipeFilter.value : '';
-                filteredRecipes = filterRecipes(allRecipes, filterText);
+                filteredRecipes = filterRecipes(allRecipes, filterText, selectedTagIds, includeUntagged);
                 currentPage = 1; // Reset to first page when loading
                 
                 displayRecipes(filteredRecipes);
@@ -1443,9 +1636,128 @@
         if (recipeFilter) {
             recipeFilter.addEventListener('input', function() {
                 const filterText = this.value;
-                filteredRecipes = filterRecipes(allRecipes, filterText);
+                filteredRecipes = filterRecipes(allRecipes, filterText, selectedTagIds, includeUntagged);
                 currentPage = 1; // Reset to first page when filtering
                 displayRecipes(filteredRecipes);
+            });
+        }
+
+        // Tag filter functions
+        function renderTagFilter() {
+            const dropdown = document.getElementById('tagFilterDropdown');
+            if (!dropdown) return;
+            
+            // Count untagged recipes
+            const untaggedCount = allRecipes.filter(recipe => !recipe.tags || recipe.tags.length === 0).length;
+            
+            let html = '';
+            
+            // Add "Untagged" option first (special styling)
+            html += `
+                <div class="tag-filter-item tag-filter-item-untagged">
+                    <input type="checkbox" class="tag-filter-checkbox" id="tag-untagged" value="untagged" ${includeUntagged ? 'checked' : ''}>
+                    <label class="tag-filter-label" for="tag-untagged">
+                        <span class="tag-filter-untagged-text">🏷️ <strong>Untagged</strong></span>
+                        <span class="tag-filter-count">${untaggedCount}</span>
+                    </label>
+                </div>
+            `;
+            
+            // Add regular tags
+            if (allTags.length > 0) {
+                html += allTags.map(tag => `
+                    <div class="tag-filter-item">
+                        <input type="checkbox" class="tag-filter-checkbox" id="tag-${tag.id}" value="${tag.id}" ${selectedTagIds.has(tag.id) ? 'checked' : ''}>
+                        <label class="tag-filter-label" for="tag-${tag.id}">
+                            <span>${escapeHtml(tag.tag_name)}</span>
+                            <span class="tag-filter-count">${tag.recipe_count}</span>
+                        </label>
+                    </div>
+                `).join('');
+            } else {
+                html += '<div style="padding: 8px; color: #999; text-align: center;">No tags available</div>';
+            }
+            
+            dropdown.innerHTML = html;
+            
+            // Add event listeners to checkboxes
+            dropdown.querySelectorAll('.tag-filter-checkbox').forEach(checkbox => {
+                checkbox.addEventListener('change', function() {
+                    if (this.value === 'untagged') {
+                        includeUntagged = this.checked;
+                    } else {
+                        const tagId = parseInt(this.value, 10);
+                        if (this.checked) {
+                            selectedTagIds.add(tagId);
+                        } else {
+                            selectedTagIds.delete(tagId);
+                        }
+                    }
+                    applyTagFilter();
+                });
+            });
+            
+            updateTagFilterToggleText();
+        }
+
+        function updateTagFilterToggleText() {
+            const toggle = document.getElementById('tagFilterToggle');
+            if (!toggle) return;
+            
+            const totalOptions = allTags.length + 1; // tags + untagged
+            const selectedCount = selectedTagIds.size + (includeUntagged ? 1 : 0);
+            
+            if (selectedCount === 0) {
+                toggle.textContent = 'No options selected';
+            } else if (selectedCount === totalOptions) {
+                toggle.textContent = 'All selected';
+            } else {
+                toggle.textContent = `${selectedCount} option${selectedCount !== 1 ? 's' : ''} selected`;
+            }
+        }
+
+        function applyTagFilter() {
+            const filterText = recipeFilter ? recipeFilter.value : '';
+            filteredRecipes = filterRecipes(allRecipes, filterText, selectedTagIds, includeUntagged);
+            currentPage = 1; // Reset to first page when filtering
+            displayRecipes(filteredRecipes);
+            updateTagFilterToggleText();
+        }
+
+        // Tag filter UI event handlers
+        const tagFilterToggle = document.getElementById('tagFilterToggle');
+        const tagFilterDropdown = document.getElementById('tagFilterDropdown');
+        const selectAllTagsBtn = document.getElementById('selectAllTagsBtn');
+        const deselectAllTagsBtn = document.getElementById('deselectAllTagsBtn');
+
+        if (tagFilterToggle && tagFilterDropdown) {
+            tagFilterToggle.addEventListener('click', function() {
+                const isActive = tagFilterDropdown.classList.contains('active');
+                if (isActive) {
+                    tagFilterDropdown.classList.remove('active');
+                    tagFilterToggle.classList.remove('active');
+                } else {
+                    tagFilterDropdown.classList.add('active');
+                    tagFilterToggle.classList.add('active');
+                }
+            });
+        }
+
+        if (selectAllTagsBtn) {
+            selectAllTagsBtn.addEventListener('click', function() {
+                selectedTagIds = new Set(allTags.map(tag => tag.id));
+                includeUntagged = true;
+                renderTagFilter();
+                applyTagFilter();
+            });
+        }
+
+        if (deselectAllTagsBtn) {
+            deselectAllTagsBtn.addEventListener('click', function() {
+                selectedTagIds.clear();
+                includeUntagged = true; // Keep "Untagged" selected
+                renderTagFilter();
+                applyTagFilter();
             });
         }
 
