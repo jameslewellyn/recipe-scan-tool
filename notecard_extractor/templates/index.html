@@ -1141,6 +1141,20 @@
                 </div>
             </div>
 
+            <div class="tag-filter-container">
+                <div class="tag-filter-header">
+                    <span class="tag-filter-title">Filter by State:</span>
+                    <div class="tag-filter-buttons">
+                        <button class="tag-filter-btn" id="selectAllStatesBtn">All</button>
+                        <button class="tag-filter-btn" id="deselectAllStatesBtn">None</button>
+                    </div>
+                </div>
+                <button class="tag-filter-toggle" id="stateFilterToggle">Select states to filter...</button>
+                <div class="tag-filter-dropdown" id="stateFilterDropdown">
+                    <!-- States will be loaded here -->
+                </div>
+            </div>
+
             <div id="viewLoading" class="loading" style="display: none;">
                 Loading recipes...
             </div>
@@ -1529,6 +1543,16 @@
         let allTags = [];
         let selectedTagIds = new Set(); // All tags selected by default
         let includeUntagged = true; // Include untagged recipes by default
+        
+        // State filtering state
+        const allStates = [
+            { value: 'not_started', label: 'Not Started', emoji: '⏳' },
+            { value: 'partially_complete', label: 'In Progress', emoji: '🔄' },
+            { value: 'complete', label: 'Complete', emoji: '✅' },
+            { value: 'broken', label: 'Broken', emoji: '❌' },
+            { value: 'duplicate', label: 'Duplicate', emoji: '📋' }
+        ];
+        let selectedStates = new Set(allStates.map(s => s.value)); // All states selected by default
 
         // Fuzzy match function - checks if search string appears in order in the target string
         function fuzzyMatch(search, target) {
@@ -1551,7 +1575,7 @@
             return searchIndex === searchLower.length;
         }
 
-        function filterRecipes(recipes, filterText, selectedTagIdsSet, includeUntaggedFlag = true) {
+        function filterRecipes(recipes, filterText, selectedTagIdsSet, includeUntaggedFlag = true, selectedStatesSet = null) {
             let filtered = recipes;
             
             // Filter by title
@@ -1582,6 +1606,18 @@
                 });
             }
             // If selectedTagIdsSet is null/undefined, show all recipes (no tag filtering)
+            
+            // Filter by state
+            if (selectedStatesSet && selectedStatesSet.size > 0) {
+                filtered = filtered.filter(recipe => {
+                    const recipeState = recipe.state || 'not_started';
+                    return selectedStatesSet.has(recipeState);
+                });
+            } else if (selectedStatesSet && selectedStatesSet.size === 0) {
+                // If no states are selected, show no recipes
+                filtered = [];
+            }
+            // If selectedStatesSet is null/undefined, show all recipes (no state filtering)
             
             return filtered;
         }
@@ -1618,9 +1654,13 @@
                     renderTagFilter();
                 }
                 
+                // Initialize state filter (all states selected by default)
+                selectedStates = new Set(allStates.map(s => s.value));
+                renderStateFilter();
+                
                 // Apply current filter if any
                 const filterText = recipeFilter ? recipeFilter.value : '';
-                filteredRecipes = filterRecipes(allRecipes, filterText, selectedTagIds, includeUntagged);
+                filteredRecipes = filterRecipes(allRecipes, filterText, selectedTagIds, includeUntagged, selectedStates);
                 currentPage = 1; // Reset to first page when loading
                 
                 displayRecipes(filteredRecipes);
@@ -1636,7 +1676,7 @@
         if (recipeFilter) {
             recipeFilter.addEventListener('input', function() {
                 const filterText = this.value;
-                filteredRecipes = filterRecipes(allRecipes, filterText, selectedTagIds, includeUntagged);
+                filteredRecipes = filterRecipes(allRecipes, filterText, selectedTagIds, includeUntagged, selectedStates);
                 currentPage = 1; // Reset to first page when filtering
                 displayRecipes(filteredRecipes);
             });
@@ -1718,10 +1758,72 @@
 
         function applyTagFilter() {
             const filterText = recipeFilter ? recipeFilter.value : '';
-            filteredRecipes = filterRecipes(allRecipes, filterText, selectedTagIds, includeUntagged);
+            filteredRecipes = filterRecipes(allRecipes, filterText, selectedTagIds, includeUntagged, selectedStates);
             currentPage = 1; // Reset to first page when filtering
             displayRecipes(filteredRecipes);
             updateTagFilterToggleText();
+        }
+
+        // State filter functions
+        function renderStateFilter() {
+            const dropdown = document.getElementById('stateFilterDropdown');
+            if (!dropdown) return;
+            
+            // Count recipes for each state
+            const stateCounts = {};
+            allRecipes.forEach(recipe => {
+                const state = recipe.state || 'not_started';
+                stateCounts[state] = (stateCounts[state] || 0) + 1;
+            });
+            
+            dropdown.innerHTML = allStates.map(state => {
+                const count = stateCounts[state.value] || 0;
+                return `
+                    <div class="tag-filter-item">
+                        <input type="checkbox" class="tag-filter-checkbox" id="state-${state.value}" value="${state.value}" ${selectedStates.has(state.value) ? 'checked' : ''}>
+                        <label class="tag-filter-label" for="state-${state.value}">
+                            <span>${state.emoji} ${state.label}</span>
+                            <span class="tag-filter-count">${count}</span>
+                        </label>
+                    </div>
+                `;
+            }).join('');
+            
+            // Add event listeners to checkboxes
+            dropdown.querySelectorAll('.tag-filter-checkbox').forEach(checkbox => {
+                checkbox.addEventListener('change', function() {
+                    const stateValue = this.value;
+                    if (this.checked) {
+                        selectedStates.add(stateValue);
+                    } else {
+                        selectedStates.delete(stateValue);
+                    }
+                    applyStateFilter();
+                });
+            });
+            
+            updateStateFilterToggleText();
+        }
+
+        function updateStateFilterToggleText() {
+            const toggle = document.getElementById('stateFilterToggle');
+            if (!toggle) return;
+            
+            if (selectedStates.size === 0) {
+                toggle.textContent = 'No states selected';
+            } else if (selectedStates.size === allStates.length) {
+                toggle.textContent = 'All states selected';
+            } else {
+                toggle.textContent = `${selectedStates.size} state${selectedStates.size !== 1 ? 's' : ''} selected`;
+            }
+        }
+
+        function applyStateFilter() {
+            const filterText = recipeFilter ? recipeFilter.value : '';
+            filteredRecipes = filterRecipes(allRecipes, filterText, selectedTagIds, includeUntagged, selectedStates);
+            currentPage = 1; // Reset to first page when filtering
+            displayRecipes(filteredRecipes);
+            updateStateFilterToggleText();
         }
 
         // Tag filter UI event handlers
@@ -1758,6 +1860,41 @@
                 includeUntagged = true; // Keep "Untagged" selected
                 renderTagFilter();
                 applyTagFilter();
+            });
+        }
+
+        // State filter UI event handlers
+        const stateFilterToggle = document.getElementById('stateFilterToggle');
+        const stateFilterDropdown = document.getElementById('stateFilterDropdown');
+        const selectAllStatesBtn = document.getElementById('selectAllStatesBtn');
+        const deselectAllStatesBtn = document.getElementById('deselectAllStatesBtn');
+
+        if (stateFilterToggle && stateFilterDropdown) {
+            stateFilterToggle.addEventListener('click', function() {
+                const isActive = stateFilterDropdown.classList.contains('active');
+                if (isActive) {
+                    stateFilterDropdown.classList.remove('active');
+                    stateFilterToggle.classList.remove('active');
+                } else {
+                    stateFilterDropdown.classList.add('active');
+                    stateFilterToggle.classList.add('active');
+                }
+            });
+        }
+
+        if (selectAllStatesBtn) {
+            selectAllStatesBtn.addEventListener('click', function() {
+                selectedStates = new Set(allStates.map(s => s.value));
+                renderStateFilter();
+                applyStateFilter();
+            });
+        }
+
+        if (deselectAllStatesBtn) {
+            deselectAllStatesBtn.addEventListener('click', function() {
+                selectedStates.clear();
+                renderStateFilter();
+                applyStateFilter();
             });
         }
 
