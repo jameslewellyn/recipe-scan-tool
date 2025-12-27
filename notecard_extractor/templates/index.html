@@ -425,6 +425,11 @@
             text-align: center;
         }
 
+        .edit-column {
+            width: 80px;
+            text-align: center;
+        }
+
         .admin-gear-icon {
             cursor: pointer;
             font-size: 1.2em;
@@ -436,6 +441,274 @@
         .admin-gear-icon:hover {
             transform: scale(1.2) rotate(15deg);
             color: #764ba2;
+        }
+
+        .edit-icon {
+            cursor: pointer;
+            font-size: 1.2em;
+            color: #667eea;
+            transition: transform 0.2s, color 0.2s;
+            display: inline-block;
+        }
+
+        .edit-icon:hover {
+            transform: scale(1.2);
+            color: #764ba2;
+        }
+
+        .edit-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 2000;
+            overflow-y: auto;
+        }
+
+        .edit-modal.active {
+            display: flex;
+            align-items: stretch;
+            justify-content: stretch;
+            padding: 0;
+        }
+
+        .edit-modal-content {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 100%;
+            height: 100vh;
+            max-height: 100vh;
+            display: flex;
+            flex-direction: row;
+            overflow: hidden;
+        }
+
+        .edit-modal-image-section {
+            flex: 0 0 50%;
+            background: #f5f5f5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .edit-modal-image-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+            cursor: grab;
+        }
+
+        .edit-modal-image-container.zoomed {
+            cursor: grabbing;
+        }
+
+        .edit-modal-image-section img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transform-origin: center center;
+            transition: transform 0.3s ease-out;
+            user-select: none;
+            pointer-events: none;
+        }
+
+        .edit-modal-image-section img.zoomed {
+            transition: none;
+        }
+
+        .edit-modal-image-nav {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            font-size: 2em;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border-radius: 50%;
+            z-index: 10;
+            transition: background 0.2s;
+        }
+
+        .edit-modal-image-nav:hover {
+            background: rgba(0, 0, 0, 0.8);
+        }
+
+        .edit-modal-image-nav-left {
+            left: 20px;
+        }
+
+        .edit-modal-image-nav-right {
+            right: 20px;
+        }
+
+        .edit-modal-image-controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px 15px;
+            border-radius: 8px;
+            z-index: 10;
+        }
+
+        .edit-modal-rotate-btn {
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid white;
+            border-radius: 50%;
+            width: 45px;
+            height: 45px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1.3em;
+            transition: all 0.2s;
+            color: #667eea;
+        }
+
+        .edit-modal-rotate-btn:hover {
+            background: white;
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .edit-modal-rotate-display {
+            color: white;
+            font-size: 1em;
+            font-weight: 600;
+            min-width: 50px;
+            text-align: center;
+        }
+
+        .edit-modal-form-section {
+            flex: 0 0 50%;
+            padding: 40px;
+            overflow-y: auto;
+        }
+
+        .edit-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .edit-modal-title {
+            font-size: 1.8em;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .edit-modal-close {
+            cursor: pointer;
+            font-size: 2em;
+            color: #666;
+            background: none;
+            border: none;
+            padding: 0;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: background 0.2s, color 0.2s;
+        }
+
+        .edit-modal-close:hover {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .edit-form-grid {
+            display: grid;
+            grid-template-columns: 150px 1fr;
+            gap: 15px 20px;
+            align-items: start;
+        }
+
+        .edit-form-label {
+            font-weight: 600;
+            color: #333;
+            padding-top: 8px;
+        }
+
+        .edit-form-input,
+        .edit-form-textarea,
+        .edit-form-select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: inherit;
+            color: #333;
+            box-sizing: border-box;
+        }
+
+        .edit-form-textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+
+        .edit-form-actions {
+            grid-column: 1 / -1;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 2px solid #e0e0e0;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .edit-form-save-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .edit-form-save-btn:hover {
+            background: #5568d3;
+        }
+
+        .edit-form-save-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .edit-form-status {
+            color: #666;
+            font-size: 0.9em;
         }
 
         .state-badge {
@@ -1197,6 +1470,7 @@
                             <th class="filename-column">Title/PDF Filename</th>
                             <th class="state-column">State</th>
                             <th class="admin-column">Admin</th>
+                            <th class="edit-column">Edit</th>
                         </tr>
                     </thead>
                     <tbody id="recipesTableBody">
@@ -1234,6 +1508,34 @@
             <div id="viewEmptyState" class="empty-state">
                 <div class="empty-state-icon">📄</div>
                 <p>No recipes uploaded yet. Use the Upload tab to add recipes to the database.</p>
+            </div>
+        </div>
+
+        <!-- Edit Recipe Modal -->
+        <div id="editModal" class="edit-modal">
+            <div class="edit-modal-content">
+                <div class="edit-modal-image-section">
+                    <div class="edit-modal-image-container" id="editModalImageContainer">
+                        <div class="edit-modal-image-nav edit-modal-image-nav-left" id="editModalNavLeft" style="display: none;">‹</div>
+                        <img id="editModalImage" src="" alt="Recipe Image" style="display: none;">
+                        <div class="edit-modal-image-nav edit-modal-image-nav-right" id="editModalNavRight" style="display: none;">›</div>
+                        <div class="edit-modal-image-controls" id="editModalImageControls" style="display: none;">
+                            <div class="edit-modal-rotate-btn" id="editModalRotateCCW" title="Rotate counter-clockwise">↶</div>
+                            <div class="edit-modal-rotate-display" id="editModalRotationDisplay">0°</div>
+                            <div class="edit-modal-rotate-btn" id="editModalRotateCW" title="Rotate clockwise">↷</div>
+                        </div>
+                    </div>
+                    <div id="editModalImagePlaceholder" style="color: #999; text-align: center;">Loading image...</div>
+                </div>
+                <div class="edit-modal-form-section">
+                    <div class="edit-modal-header">
+                        <h2 class="edit-modal-title" id="editModalTitle">Edit Recipe</h2>
+                        <button class="edit-modal-close" id="editModalClose">×</button>
+                    </div>
+                    <form id="editRecipeForm" class="edit-form-grid">
+                        <!-- Form fields will be populated dynamically -->
+                    </form>
+                </div>
             </div>
         </div>
 
@@ -1959,6 +2261,7 @@
                     <td class="filename-column">${escapeHtml(recipe.title || recipe.pdf_filename || 'Unknown')}</td>
                     <td class="state-column">${stateBadge}</td>
                     <td class="admin-column"><span class="admin-gear-icon" data-recipe-id="${recipe.id || ''}">⚙️</span></td>
+                    <td class="edit-column"><span class="edit-icon" data-recipe-id="${recipe.id || ''}" title="Edit recipe">✏️</span></td>
                 `;
                 row.setAttribute('data-pdf-filename', recipe.pdf_filename || '');
                 recipesTableBody.appendChild(row);
@@ -1968,7 +2271,7 @@
                 expandRow.className = 'expandable-row-content';
                 expandRow.setAttribute('data-recipe-id', recipe.id || '');
                 const expandCell = document.createElement('td');
-                expandCell.colSpan = 6; // Count, Thumbnail, Timestamp, Filename, State, Admin
+                expandCell.colSpan = 7; // Count, Thumbnail, Timestamp, Filename, State, Admin, Edit
                 expandCell.innerHTML = '<div class="detail-grid"><div class="detail-label">Loading...</div><div class="detail-value"></div></div>';
                 expandRow.appendChild(expandCell);
                 recipesTableBody.appendChild(expandRow);
@@ -1979,6 +2282,15 @@
                     gearIcon.addEventListener('click', function(e) {
                         e.stopPropagation();
                         toggleRowExpansion(recipe.id);
+                    });
+                }
+
+                // Add click handler to edit icon
+                const editIcon = row.querySelector('.edit-icon');
+                if (editIcon) {
+                    editIcon.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        openEditModal(recipe.id);
                     });
                 }
 
@@ -3070,6 +3382,540 @@
             }
         });
         
+        // Edit Modal Functions
+        async function openEditModal(recipeId) {
+            const modal = document.getElementById('editModal');
+            const form = document.getElementById('editRecipeForm');
+            const image = document.getElementById('editModalImage');
+            const imagePlaceholder = document.getElementById('editModalImagePlaceholder');
+            const title = document.getElementById('editModalTitle');
+            const container = document.getElementById('editModalImageContainer');
+            
+            if (!modal || !form) return;
+            
+            // Reset state
+            editModalRecipeId = recipeId;
+            editModalImages = [];
+            editModalCurrentIndex = 0;
+            editModalZoomed = false;
+            editModalImageTransform = { x: 0, y: 0, scale: 1 };
+            
+            // Show modal
+            modal.classList.add('active');
+            
+            // Reset form
+            form.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 20px; color: #666;">Loading recipe data...</div>';
+            image.style.display = 'none';
+            imagePlaceholder.style.display = 'block';
+            imagePlaceholder.textContent = 'Loading image...';
+            if (container) {
+                container.classList.remove('zoomed');
+            }
+            
+            // Hide controls initially
+            document.getElementById('editModalNavLeft').style.display = 'none';
+            document.getElementById('editModalNavRight').style.display = 'none';
+            document.getElementById('editModalImageControls').style.display = 'none';
+            
+            try {
+                // Fetch recipe data
+                const response = await fetch(`/api/recipe/${recipeId}`);
+                if (!response.ok) {
+                    throw new Error('Failed to load recipe');
+                }
+                
+                const data = await response.json();
+                
+                // Set title
+                title.textContent = `Edit: ${data.title || data.pdf_filename || 'Recipe'}`;
+                
+                // Build image list (pages + dish images)
+                if (data.pages && data.pages.length > 0) {
+                    data.pages.forEach(page => {
+                        editModalImages.push({
+                            type: 'page',
+                            number: page.pdf_page_number,
+                            rotation: page.rotation || 0
+                        });
+                    });
+                }
+                
+                if (data.dish_images && data.dish_images.length > 0) {
+                    data.dish_images.forEach(dishImg => {
+                        editModalImages.push({
+                            type: 'dish',
+                            number: dishImg.image_number,
+                            rotation: dishImg.rotation || 0
+                        });
+                    });
+                }
+                
+                // Load first image
+                if (editModalImages.length > 0) {
+                    loadEditModalImage(0);
+                } else {
+                    imagePlaceholder.textContent = 'No image available';
+                }
+                
+                // Build form fields
+                const stateOptions = ['not_started', 'partially_complete', 'complete', 'broken', 'duplicate'];
+                const stateOptionLabels = {
+                    'not_started': 'Not Started',
+                    'partially_complete': 'In Progress',
+                    'complete': 'Complete',
+                    'broken': 'Broken',
+                    'duplicate': 'Duplicate'
+                };
+                
+                form.innerHTML = `
+                    <div class="edit-form-label">State:</div>
+                    <div>
+                        <select class="edit-form-select" id="edit-state" data-field="state">
+                            ${stateOptions.map(state => `<option value="${state}" ${data.state === state ? 'selected' : ''}>${stateOptionLabels[state]}</option>`).join('')}
+                        </select>
+                    </div>
+                    
+                    <div class="edit-form-label">Title:</div>
+                    <div>
+                        <input type="text" class="edit-form-input" id="edit-title" data-field="title" value="${escapeHtml(data.title || '')}" placeholder="Not set">
+                    </div>
+                    
+                    <div class="edit-form-label">Description:</div>
+                    <div>
+                        <textarea class="edit-form-textarea" id="edit-description" data-field="description" placeholder="Not set">${escapeHtml(data.description || '')}</textarea>
+                    </div>
+                    
+                    <div class="edit-form-label">Year:</div>
+                    <div>
+                        <input type="number" class="edit-form-input" id="edit-year" data-field="year" value="${data.year || ''}" placeholder="Not set">
+                    </div>
+                    
+                    <div class="edit-form-label">Author:</div>
+                    <div>
+                        <input type="text" class="edit-form-input" id="edit-author" data-field="author" value="${escapeHtml(data.author || '')}" placeholder="Not set">
+                    </div>
+                    
+                    <div class="edit-form-label">Ingredients:</div>
+                    <div>
+                        <textarea class="edit-form-textarea" id="edit-ingredients" data-field="ingredients" placeholder="Not set">${escapeHtml(data.ingredients || '')}</textarea>
+                    </div>
+                    
+                    <div class="edit-form-label">Recipe:</div>
+                    <div>
+                        <textarea class="edit-form-textarea" id="edit-recipe" data-field="recipe" placeholder="Not set">${escapeHtml(data.recipe || '')}</textarea>
+                    </div>
+                    
+                    <div class="edit-form-label">Cook Time:</div>
+                    <div>
+                        <input type="text" class="edit-form-input" id="edit-cook-time" data-field="cook_time" value="${escapeHtml(data.cook_time || '')}" placeholder="Not set">
+                    </div>
+                    
+                    <div class="edit-form-label">Notes:</div>
+                    <div>
+                        <textarea class="edit-form-textarea" id="edit-notes" data-field="notes" placeholder="Not set">${escapeHtml(data.notes || '')}</textarea>
+                    </div>
+                    
+                    <div class="edit-form-actions">
+                        <button type="button" class="edit-form-save-btn" id="edit-save-btn" data-recipe-id="${recipeId}">💾 Save Changes</button>
+                        <span class="edit-form-status" id="edit-status"></span>
+                    </div>
+                `;
+                
+                // Add save button handler
+                const saveBtn = document.getElementById('edit-save-btn');
+                if (saveBtn) {
+                    saveBtn.addEventListener('click', function() {
+                        saveEditRecipe(recipeId);
+                    });
+                }
+                
+            } catch (error) {
+                console.error('Error loading recipe for edit:', error);
+                form.innerHTML = `<div style="grid-column: 1 / -1; color: #c33; padding: 20px;">Error loading recipe: ${escapeHtml(error.message)}</div>`;
+            }
+        }
+
+        function loadEditModalImage(index) {
+            if (index < 0 || index >= editModalImages.length) return;
+            
+            editModalCurrentIndex = index;
+            const imageData = editModalImages[index];
+            const image = document.getElementById('editModalImage');
+            const imagePlaceholder = document.getElementById('editModalImagePlaceholder');
+            const navLeft = document.getElementById('editModalNavLeft');
+            const navRight = document.getElementById('editModalNavRight');
+            const controls = document.getElementById('editModalImageControls');
+            
+            // Build image URL
+            let imageUrl;
+            if (imageData.type === 'page') {
+                imageUrl = `/api/recipe/${editModalRecipeId}/page/${imageData.number}/image`;
+            } else {
+                imageUrl = `/api/recipe/${editModalRecipeId}/dish/${imageData.number}/image`;
+            }
+            
+            // Reset zoom and position
+            editModalZoomed = false;
+            editModalImageTransform = { x: 0, y: 0, scale: 1 };
+            editModalCurrentRotation = imageData.rotation || 0;
+            updateEditModalImageTransform();
+            
+            // Show/hide navigation
+            if (editModalImages.length > 1) {
+                navLeft.style.display = 'flex';
+                navRight.style.display = 'flex';
+            } else {
+                navLeft.style.display = 'none';
+                navRight.style.display = 'none';
+            }
+            
+            // Show controls
+            controls.style.display = 'flex';
+            updateEditModalRotationDisplay();
+            
+            // Load image
+            image.src = imageUrl;
+            image.onload = function() {
+                image.style.display = 'block';
+                imagePlaceholder.style.display = 'none';
+            };
+            image.onerror = function() {
+                imagePlaceholder.textContent = 'Image not available';
+            };
+        }
+
+        function updateEditModalImageTransform() {
+            const image = document.getElementById('editModalImage');
+            const container = document.getElementById('editModalImageContainer');
+            
+            if (!image || !container) return;
+            
+            const rotation = editModalCurrentRotation || 0;
+            const scale = editModalImageTransform.scale;
+            const x = editModalImageTransform.x;
+            const y = editModalImageTransform.y;
+            
+            image.style.transform = `translate(${x}px, ${y}px) scale(${scale}) rotate(${rotation}deg)`;
+            
+            if (editModalZoomed) {
+                container.classList.add('zoomed');
+            } else {
+                container.classList.remove('zoomed');
+            }
+        }
+
+        function updateEditModalRotationDisplay() {
+            const display = document.getElementById('editModalRotationDisplay');
+            if (display) {
+                display.textContent = `${editModalCurrentRotation}°`;
+            }
+        }
+
+        function toggleEditModalZoom() {
+            editModalZoomed = !editModalZoomed;
+            
+            if (editModalZoomed) {
+                editModalImageTransform.scale = 2;
+            } else {
+                editModalImageTransform.scale = 1;
+                editModalImageTransform.x = 0;
+                editModalImageTransform.y = 0;
+            }
+            
+            updateEditModalImageTransform();
+        }
+
+        function closeEditModal() {
+            const modal = document.getElementById('editModal');
+            if (modal) {
+                modal.classList.remove('active');
+                // Reset state
+                editModalZoomed = false;
+                editModalImageTransform = { x: 0, y: 0, scale: 1 };
+                const container = document.getElementById('editModalImageContainer');
+                if (container) {
+                    container.classList.remove('zoomed');
+                }
+            }
+        }
+
+        async function saveEditRecipe(recipeId) {
+            const saveBtn = document.getElementById('edit-save-btn');
+            const statusSpan = document.getElementById('edit-status');
+            
+            if (!saveBtn || !statusSpan) return;
+            
+            // Collect field values
+            const fields = {};
+            const inputs = document.querySelectorAll('#editRecipeForm [data-field]');
+            
+            inputs.forEach(input => {
+                const fieldName = input.getAttribute('data-field');
+                if (fieldName) {
+                    if (input.tagName === 'TEXTAREA' || input.tagName === 'INPUT') {
+                        fields[fieldName] = input.value || null;
+                    } else if (input.tagName === 'SELECT') {
+                        fields[fieldName] = input.value;
+                    }
+                }
+            });
+            
+            // Convert year to number if provided
+            if (fields.year !== null && fields.year !== undefined && fields.year !== '') {
+                const yearNum = parseInt(fields.year, 10);
+                if (!isNaN(yearNum)) {
+                    fields.year = yearNum;
+                } else {
+                    fields.year = null;
+                }
+            } else {
+                fields.year = null;
+            }
+            
+            // Show saving status
+            saveBtn.disabled = true;
+            statusSpan.textContent = 'Saving...';
+            statusSpan.style.color = '#666';
+            
+            try {
+                const response = await fetch(`/api/recipe/${recipeId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(fields)
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+                    throw new Error(errorData.error || 'Failed to save changes');
+                }
+                
+                statusSpan.textContent = '✓ Saved successfully';
+                statusSpan.style.color = '#28a745';
+                
+                // Reload recipes to update the view
+                await loadRecipes();
+                
+                // Close modal after a short delay
+                setTimeout(() => {
+                    closeEditModal();
+                }, 1000);
+                
+            } catch (error) {
+                console.error('Save error:', error);
+                statusSpan.textContent = '✗ Error: ' + error.message;
+                statusSpan.style.color = '#c33';
+            } finally {
+                saveBtn.disabled = false;
+            }
+        }
+
+        // Edit modal event handlers
+        const editModal = document.getElementById('editModal');
+        const editModalClose = document.getElementById('editModalClose');
+        const editModalImage = document.getElementById('editModalImage');
+        const editModalImageContainer = document.getElementById('editModalImageContainer');
+        const editModalNavLeft = document.getElementById('editModalNavLeft');
+        const editModalNavRight = document.getElementById('editModalNavRight');
+        const editModalRotateCW = document.getElementById('editModalRotateCW');
+        const editModalRotateCCW = document.getElementById('editModalRotateCCW');
+        
+        if (editModalClose) {
+            editModalClose.addEventListener('click', closeEditModal);
+        }
+        
+        if (editModal) {
+            editModal.addEventListener('click', function(e) {
+                if (e.target === editModal) {
+                    closeEditModal();
+                }
+            });
+        }
+        
+        // Drag to pan when zoomed and click to zoom
+        if (editModalImageContainer) {
+            let isDragging = false;
+            let dragStartX = 0;
+            let dragStartY = 0;
+            let dragStartPosX = 0;
+            let dragStartPosY = 0;
+            let hasDragged = false;
+            
+            editModalImageContainer.addEventListener('mousedown', function(e) {
+                // Don't handle if clicking on controls or navigation
+                if (e.target.closest('.edit-modal-image-nav') || 
+                    e.target.closest('.edit-modal-image-controls') ||
+                    e.target.closest('.edit-modal-rotate-btn')) {
+                    return;
+                }
+                
+                if (editModalZoomed) {
+                    // Start drag
+                    isDragging = true;
+                    hasDragged = false;
+                    dragStartX = e.clientX;
+                    dragStartY = e.clientY;
+                    dragStartPosX = editModalImageTransform.x;
+                    dragStartPosY = editModalImageTransform.y;
+                    e.preventDefault();
+                } else {
+                    // Track for potential drag (even when not zoomed)
+                    isDragging = true;
+                    hasDragged = false;
+                    dragStartX = e.clientX;
+                    dragStartY = e.clientY;
+                }
+            });
+            
+            document.addEventListener('mousemove', function(e) {
+                if (!isDragging) return;
+                
+                const deltaX = Math.abs(e.clientX - dragStartX);
+                const deltaY = Math.abs(e.clientY - dragStartY);
+                
+                // If moved more than 5 pixels, consider it a drag
+                if (deltaX > 5 || deltaY > 5) {
+                    hasDragged = true;
+                }
+                
+                if (editModalZoomed && hasDragged) {
+                    // Update pan position
+                    editModalImageTransform.x = dragStartPosX + (e.clientX - dragStartX);
+                    editModalImageTransform.y = dragStartPosY + (e.clientY - dragStartY);
+                    updateEditModalImageTransform();
+                }
+            });
+            
+            editModalImageContainer.addEventListener('mouseup', function(e) {
+                if (!isDragging) return;
+                
+                // If it was a drag, don't toggle zoom
+                if (hasDragged) {
+                    isDragging = false;
+                    hasDragged = false;
+                    return;
+                }
+                
+                // If it was just a click (no drag), toggle zoom
+                if (!editModalZoomed) {
+                    // Don't zoom if clicking on controls or navigation
+                    if (e.target.closest('.edit-modal-image-nav') || 
+                        e.target.closest('.edit-modal-image-controls') ||
+                        e.target.closest('.edit-modal-rotate-btn')) {
+                        isDragging = false;
+                        hasDragged = false;
+                        return;
+                    }
+                    toggleEditModalZoom();
+                } else {
+                    // If already zoomed and it's a click (not drag), zoom out
+                    toggleEditModalZoom();
+                }
+                
+                isDragging = false;
+                hasDragged = false;
+            });
+        }
+        
+        // Navigation arrows
+        if (editModalNavLeft) {
+            editModalNavLeft.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (editModalCurrentIndex > 0) {
+                    loadEditModalImage(editModalCurrentIndex - 1);
+                } else {
+                    loadEditModalImage(editModalImages.length - 1); // Wrap to last
+                }
+            });
+        }
+        
+        if (editModalNavRight) {
+            editModalNavRight.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (editModalCurrentIndex < editModalImages.length - 1) {
+                    loadEditModalImage(editModalCurrentIndex + 1);
+                } else {
+                    loadEditModalImage(0); // Wrap to first
+                }
+            });
+        }
+        
+        // Rotation buttons
+        if (editModalRotateCW) {
+            editModalRotateCW.addEventListener('click', async function(e) {
+                e.stopPropagation();
+                editModalCurrentRotation = (editModalCurrentRotation + 90) % 360;
+                updateEditModalImageTransform();
+                updateEditModalRotationDisplay();
+                await saveEditModalRotation();
+            });
+        }
+        
+        if (editModalRotateCCW) {
+            editModalRotateCCW.addEventListener('click', async function(e) {
+                e.stopPropagation();
+                editModalCurrentRotation = (editModalCurrentRotation - 90 + 360) % 360;
+                updateEditModalImageTransform();
+                updateEditModalRotationDisplay();
+                await saveEditModalRotation();
+            });
+        }
+        
+        async function saveEditModalRotation() {
+            if (!editModalRecipeId || editModalImages.length === 0) return;
+            
+            const imageData = editModalImages[editModalCurrentIndex];
+            const rotationData = { rotation: editModalCurrentRotation };
+            
+            if (imageData.type === 'page') {
+                rotationData.image_type = 'page';
+                rotationData.page_number = imageData.number;
+            } else {
+                rotationData.image_type = 'dish';
+                rotationData.dish_number = imageData.number;
+            }
+            
+            try {
+                const response = await fetch(`/api/recipe/${editModalRecipeId}/rotation`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(rotationData)
+                });
+                
+                if (!response.ok) {
+                    const data = await response.json();
+                    throw new Error(data.error || 'Failed to update rotation');
+                }
+                
+                // Update the image data rotation
+                imageData.rotation = editModalCurrentRotation;
+            } catch (error) {
+                console.error('Error updating rotation:', error);
+                // Revert rotation on error
+                editModalCurrentRotation = imageData.rotation || 0;
+                updateEditModalImageTransform();
+                updateEditModalRotationDisplay();
+            }
+        }
+        
+        // Keyboard navigation for edit modal
+        document.addEventListener('keydown', function(e) {
+            if (editModal && editModal.classList.contains('active')) {
+                if (e.key === 'Escape') {
+                    closeEditModal();
+                } else if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    if (editModalNavLeft) editModalNavLeft.click();
+                } else if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    if (editModalNavRight) editModalNavRight.click();
+                }
+            }
+        });
+
         // Load recipes on page load if View tab is active
         if (document.getElementById('view-tab').classList.contains('active')) {
             loadRecipes();
