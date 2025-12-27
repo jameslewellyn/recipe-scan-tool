@@ -1189,12 +1189,31 @@
             color: #999;
         }
 
-        .tag-filter-container {
+        .filters-container {
+            display: flex;
+            gap: 15px;
             margin: 15px 20px;
+            flex-wrap: wrap;
+            align-items: flex-start;
+        }
+
+        .filter-section {
+            flex: 1;
+            min-width: 250px;
             padding: 15px;
             background: #f8f8f8;
             border-radius: 8px;
             border: 1px solid #e0e0e0;
+        }
+
+        .tag-filter-container {
+            margin: 0;
+            padding: 15px;
+            background: #f8f8f8;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+            flex: 1;
+            min-width: 250px;
         }
 
         .tag-filter-header {
@@ -1395,36 +1414,38 @@
                 <div id="recipeCount" class="file-count" style="display: none;">0 Recipes</div>
             </div>
 
-            <div style="margin: 15px 20px; padding: 15px; background: #f8f8f8; border-radius: 8px; border: 1px solid #e0e0e0;">
-                <label for="recipeFilter" style="display: block; margin-bottom: 8px; font-weight: 600; color: #333;">Filter by Title:</label>
-                <input type="text" id="recipeFilter" placeholder="Type to filter recipes by title..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; box-sizing: border-box;">
-            </div>
+            <div class="filters-container">
+                <div class="filter-section">
+                    <label for="recipeFilter" style="display: block; margin-bottom: 8px; font-weight: 600; color: #333;">Filter by Title:</label>
+                    <input type="text" id="recipeFilter" placeholder="Type to filter recipes by title..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; box-sizing: border-box;">
+                </div>
 
-            <div class="tag-filter-container">
-                <div class="tag-filter-header">
-                    <span class="tag-filter-title">Filter by Tags:</span>
-                    <div class="tag-filter-buttons">
-                        <button class="tag-filter-btn" id="selectAllTagsBtn">All</button>
-                        <button class="tag-filter-btn" id="deselectAllTagsBtn">Untagged</button>
+                <div class="tag-filter-container">
+                    <div class="tag-filter-header">
+                        <span class="tag-filter-title">Filter by Tags:</span>
+                        <div class="tag-filter-buttons">
+                            <button class="tag-filter-btn" id="selectAllTagsBtn">All</button>
+                            <button class="tag-filter-btn" id="deselectAllTagsBtn">Untagged</button>
+                        </div>
+                    </div>
+                    <button class="tag-filter-toggle" id="tagFilterToggle">Select tags to filter...</button>
+                    <div class="tag-filter-dropdown" id="tagFilterDropdown">
+                        <!-- Tags will be loaded here -->
                     </div>
                 </div>
-                <button class="tag-filter-toggle" id="tagFilterToggle">Select tags to filter...</button>
-                <div class="tag-filter-dropdown" id="tagFilterDropdown">
-                    <!-- Tags will be loaded here -->
-                </div>
-            </div>
 
-            <div class="tag-filter-container">
-                <div class="tag-filter-header">
-                    <span class="tag-filter-title">Filter by State:</span>
-                    <div class="tag-filter-buttons">
-                        <button class="tag-filter-btn" id="selectAllStatesBtn">All</button>
-                        <button class="tag-filter-btn" id="deselectAllStatesBtn">None</button>
+                <div class="tag-filter-container">
+                    <div class="tag-filter-header">
+                        <span class="tag-filter-title">Filter by State:</span>
+                        <div class="tag-filter-buttons">
+                            <button class="tag-filter-btn" id="selectAllStatesBtn">All</button>
+                            <button class="tag-filter-btn" id="deselectAllStatesBtn">None</button>
+                        </div>
                     </div>
-                </div>
-                <button class="tag-filter-toggle" id="stateFilterToggle">Select states to filter...</button>
-                <div class="tag-filter-dropdown" id="stateFilterDropdown">
-                    <!-- States will be loaded here -->
+                    <button class="tag-filter-toggle" id="stateFilterToggle">Select states to filter...</button>
+                    <div class="tag-filter-dropdown" id="stateFilterDropdown">
+                        <!-- States will be loaded here -->
+                    </div>
                 </div>
             </div>
 
