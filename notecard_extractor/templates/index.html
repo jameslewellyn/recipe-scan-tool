@@ -861,6 +861,12 @@
             padding: 60px 80px 30px 80px;
             box-sizing: border-box;
             position: relative;
+            overflow: hidden;
+            cursor: grab;
+        }
+
+        .image-overlay-content.zoomed {
+            cursor: grabbing;
         }
 
         .image-overlay-content img {
@@ -877,6 +883,12 @@
             flex-shrink: 0;
             display: block;
             margin: auto;
+            user-select: none;
+            pointer-events: none;
+        }
+
+        .image-overlay-content img.zoomed {
+            transition: none;
         }
 
         .image-overlay-title {
@@ -3112,6 +3124,8 @@
         let currentImageIndex = 0; // Index within current group
         let currentImageGroup = []; // Array of images in current group
         let currentGroupType = null; // 'recipe' or 'dish'
+        let imageOverlayZoomed = false;
+        let imageOverlayTransform = { x: 0, y: 0, scale: 1 };
 
         function showImagePreview(recipeId, imageType = 'recipe', pageNumber = null, dishNumber = null) {
             // Convert recipeId to number for comparison
@@ -3213,8 +3227,11 @@
             }
             
             currentRotation = rotation;
+            // Reset zoom and position when loading new image
+            imageOverlayZoomed = false;
+            imageOverlayTransform = { x: 0, y: 0, scale: 1 };
             updateRotationDisplay();
-            updateImageRotation();
+            updateImageOverlayTransform();
             
             previewImage.onerror = function() {
                 this.onerror = null;
@@ -3275,9 +3292,41 @@
 
         function updateImageRotation() {
             if (previewImage) {
-                previewImage.style.transform = `rotate(${currentRotation}deg)`;
+                const rotation = currentRotation || 0;
+                const scale = imageOverlayTransform.scale;
+                const x = imageOverlayTransform.x;
+                const y = imageOverlayTransform.y;
+                previewImage.style.transform = `translate(${x}px, ${y}px) scale(${scale}) rotate(${rotation}deg)`;
                 previewImage.style.transformOrigin = 'center center';
             }
+        }
+
+        function updateImageOverlayTransform() {
+            updateImageRotation();
+            const content = document.querySelector('.image-overlay-content');
+            if (content) {
+                if (imageOverlayZoomed) {
+                    content.classList.add('zoomed');
+                    previewImage.classList.add('zoomed');
+                } else {
+                    content.classList.remove('zoomed');
+                    previewImage.classList.remove('zoomed');
+                }
+            }
+        }
+
+        function toggleImageOverlayZoom() {
+            imageOverlayZoomed = !imageOverlayZoomed;
+            
+            if (imageOverlayZoomed) {
+                imageOverlayTransform.scale = 2;
+            } else {
+                imageOverlayTransform.scale = 1;
+                imageOverlayTransform.x = 0;
+                imageOverlayTransform.y = 0;
+            }
+            
+            updateImageOverlayTransform();
         }
 
         async function rotateImage(direction) {
@@ -3295,7 +3344,7 @@
             
             // Update display immediately for responsive UI
             updateRotationDisplay();
-            updateImageRotation();
+            updateImageOverlayTransform();
             
             // Update database
             try {
@@ -3334,7 +3383,7 @@
                     currentRotation = (currentRotation + 90) % 360;
                 }
                 updateRotationDisplay();
-                updateImageRotation();
+                updateImageOverlayTransform();
             }
         }
 
@@ -3361,6 +3410,8 @@
             currentImageIndex = 0;
             currentImageGroup = [];
             currentGroupType = null;
+            imageOverlayZoomed = false;
+            imageOverlayTransform = { x: 0, y: 0, scale: 1 };
             document.getElementById('imageNavLeft').style.display = 'none';
             document.getElementById('imageNavRight').style.display = 'none';
         }
@@ -3409,6 +3460,94 @@
                 hideImagePreview();
             }
         });
+
+        // Click to zoom and drag to pan functionality for image overlay
+        const imageOverlayContent = document.querySelector('.image-overlay-content');
+        if (imageOverlayContent && previewImage) {
+            let isDragging = false;
+            let dragStartX = 0;
+            let dragStartY = 0;
+            let dragStartPosX = 0;
+            let dragStartPosY = 0;
+            let hasDragged = false;
+            
+            imageOverlayContent.addEventListener('mousedown', function(e) {
+                // Don't handle if clicking on controls, navigation, or close button
+                if (e.target.closest('.image-nav-arrow') || 
+                    e.target.closest('.rotation-controls') ||
+                    e.target.closest('.image-overlay-close') ||
+                    e.target.closest('.image-overlay-title')) {
+                    return;
+                }
+                
+                if (imageOverlayZoomed) {
+                    // Start drag
+                    isDragging = true;
+                    hasDragged = false;
+                    dragStartX = e.clientX;
+                    dragStartY = e.clientY;
+                    dragStartPosX = imageOverlayTransform.x;
+                    dragStartPosY = imageOverlayTransform.y;
+                    e.preventDefault();
+                } else {
+                    // Track for potential drag (even when not zoomed)
+                    isDragging = true;
+                    hasDragged = false;
+                    dragStartX = e.clientX;
+                    dragStartY = e.clientY;
+                }
+            });
+            
+            document.addEventListener('mousemove', function(e) {
+                if (!isDragging) return;
+                
+                const deltaX = Math.abs(e.clientX - dragStartX);
+                const deltaY = Math.abs(e.clientY - dragStartY);
+                
+                // If moved more than 5 pixels, consider it a drag
+                if (deltaX > 5 || deltaY > 5) {
+                    hasDragged = true;
+                }
+                
+                if (imageOverlayZoomed && hasDragged) {
+                    // Update pan position
+                    imageOverlayTransform.x = dragStartPosX + (e.clientX - dragStartX);
+                    imageOverlayTransform.y = dragStartPosY + (e.clientY - dragStartY);
+                    updateImageOverlayTransform();
+                }
+            });
+            
+            imageOverlayContent.addEventListener('mouseup', function(e) {
+                if (!isDragging) return;
+                
+                // If it was a drag, don't toggle zoom
+                if (hasDragged) {
+                    isDragging = false;
+                    hasDragged = false;
+                    return;
+                }
+                
+                // If it was just a click (no drag), toggle zoom
+                if (!imageOverlayZoomed) {
+                    // Don't zoom if clicking on controls, navigation, or close button
+                    if (e.target.closest('.image-nav-arrow') || 
+                        e.target.closest('.rotation-controls') ||
+                        e.target.closest('.image-overlay-close') ||
+                        e.target.closest('.image-overlay-title')) {
+                        isDragging = false;
+                        hasDragged = false;
+                        return;
+                    }
+                    toggleImageOverlayZoom();
+                } else {
+                    // If already zoomed and it's a click (not drag), zoom out
+                    toggleImageOverlayZoom();
+                }
+                
+                isDragging = false;
+                hasDragged = false;
+            });
+        }
 
         // Event delegation for save buttons (works for dynamically added buttons)
         document.addEventListener('click', async function(e) {
