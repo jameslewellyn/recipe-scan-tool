@@ -7,8 +7,7 @@ Extracts images from PDF files.
 from pathlib import Path
 import typer
 from pypdf import PdfReader
-from PIL import Image
-import io
+from notecard_extractor.utils.pdf_utils import extract_images_from_pdf_page
 
 
 def extract_notecards(
@@ -60,58 +59,36 @@ def extract_notecards(
 
             # Iterate through pages to extract one image per page
             for page_num, page in enumerate(reader.pages):
-                page_image_found = False
-
-                # Extract images from the page
-                for image_index, image_file_object in enumerate(page.images):
-                    try:
-                        # Get image data
-                        image_data = image_file_object.data
-
-                        # Determine file extension from image name or default to png
-                        image_name = image_file_object.name
-                        if image_name:
-                            # Try to infer extension from name
-                            ext = Path(image_name).suffix.lower()
-                            if ext not in [
-                                ".png",
-                                ".jpg",
-                                ".jpeg",
-                                ".gif",
-                                ".bmp",
-                                ".tiff",
-                            ]:
-                                ext = ".png"  # Default to PNG
-                        else:
-                            ext = ".png"  # Default to PNG
-
-                        # Open image with PIL
-                        image = Image.open(io.BytesIO(image_data))
-
-                        # Save image with _page# before the suffix
-                        output_path = (
-                            output_folder / f"{pdf_file.stem}_page{page_num}{ext}"
-                        )
-                        image.save(output_path)
-                        typer.echo(
-                            f"  ✓ Extracted image from page {page_num + 1}: {output_path.name}"
-                        )
-                        images_found = True
-                        page_image_found = True
-                        break  # Only extract the first image from each page
-
-                    except Exception as e:
-                        typer.echo(
-                            f"  ⚠ Error extracting image {image_index} from page {page_num + 1}: {e}",
-                            err=True,
-                        )
-                        continue
-
-                if not page_image_found:
+                # Use shared utility to extract image from page
+                image = extract_images_from_pdf_page(page, page_num)
+                
+                if image is None:
                     typer.echo(
                         f"  ⚠ No image found on page {page_num + 1} of '{pdf_file.name}'",
                         err=True,
                     )
+                    continue
+
+                try:
+                    # Determine file extension (default to PNG)
+                    ext = ".png"
+
+                    # Save image with _page# before the suffix
+                    output_path = (
+                        output_folder / f"{pdf_file.stem}_page{page_num}{ext}"
+                    )
+                    image.save(output_path)
+                    typer.echo(
+                        f"  ✓ Extracted image from page {page_num + 1}: {output_path.name}"
+                    )
+                    images_found = True
+
+                except Exception as e:
+                    typer.echo(
+                        f"  ⚠ Error saving image from page {page_num + 1}: {e}",
+                        err=True,
+                    )
+                    continue
 
             if not images_found:
                 typer.echo(f"  ⚠ No images found in '{pdf_file.name}'", err=True)
