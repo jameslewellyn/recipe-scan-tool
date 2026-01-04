@@ -1911,6 +1911,60 @@
         ];
         let selectedStates = new Set(allStates.map(s => s.value)); // All states selected by default
 
+        // State persistence functions
+        function saveViewState() {
+            try {
+                const state = {
+                    currentPage: currentPage,
+                    pageSize: pageSize,
+                    filterText: recipeFilter ? recipeFilter.value : '',
+                    selectedTagIds: Array.from(selectedTagIds),
+                    includeUntagged: includeUntagged,
+                    selectedStates: Array.from(selectedStates)
+                };
+                localStorage.setItem('recipeViewState', JSON.stringify(state));
+            } catch (error) {
+                console.error('Error saving view state:', error);
+            }
+        }
+
+        function loadViewState() {
+            try {
+                const saved = localStorage.getItem('recipeViewState');
+                if (saved) {
+                    const state = JSON.parse(saved);
+                    if (state.currentPage) currentPage = state.currentPage;
+                    if (state.pageSize) {
+                        pageSize = state.pageSize;
+                        const pageSizeSelect = document.getElementById('pageSizeSelect');
+                        if (pageSizeSelect) {
+                            pageSizeSelect.value = pageSize;
+                        }
+                    }
+                    if (state.filterText !== undefined && recipeFilter) {
+                        recipeFilter.value = state.filterText;
+                    }
+                    if (state.selectedTagIds && allTags.length > 0) {
+                        // Only restore tag IDs that still exist
+                        const validTagIds = allTags.map(tag => tag.id);
+                        selectedTagIds = new Set(state.selectedTagIds.filter(id => validTagIds.includes(id)));
+                    }
+                    if (typeof state.includeUntagged === 'boolean') {
+                        includeUntagged = state.includeUntagged;
+                    }
+                    if (state.selectedStates) {
+                        // Only restore states that are valid
+                        const validStates = allStates.map(s => s.value);
+                        selectedStates = new Set(state.selectedStates.filter(s => validStates.includes(s)));
+                    }
+                    return true;
+                }
+            } catch (error) {
+                console.error('Error loading view state:', error);
+            }
+            return false;
+        }
+
         // Fuzzy match function - checks if search string appears in order in the target string
         function fuzzyMatch(search, target) {
             if (!search || search.trim() === '') return true;
@@ -2008,19 +2062,32 @@
                     // Select all tags by default, and include untagged
                     selectedTagIds = new Set(allTags.map(tag => tag.id));
                     includeUntagged = true;
-                    renderTagFilter();
                 }
                 
                 // Initialize state filter (all states selected by default)
                 selectedStates = new Set(allStates.map(s => s.value));
+                
+                // Load persisted state (overrides defaults if available)
+                const hasPersistedState = loadViewState();
+                
+                // Render filters after loading state
+                renderTagFilter();
                 renderStateFilter();
                 
                 // Apply current filter if any
                 const filterText = recipeFilter ? recipeFilter.value : '';
                 filteredRecipes = filterRecipes(allRecipes, filterText, selectedTagIds, includeUntagged, selectedStates);
-                currentPage = 1; // Reset to first page when loading
+                // Preserve current page instead of resetting (or use persisted page)
+                const totalPages = Math.max(1, Math.ceil(filteredRecipes.length / pageSize));
+                if (currentPage > totalPages) {
+                    currentPage = totalPages;
+                }
                 
                 displayRecipes(filteredRecipes);
+                // Only save state if we didn't just load it (to avoid overwriting with defaults)
+                if (!hasPersistedState) {
+                    saveViewState();
+                }
             } catch (error) {
                 viewError.textContent = 'Error loading recipes: ' + error.message;
                 viewError.style.display = 'block';
@@ -2033,9 +2100,17 @@
         if (recipeFilter) {
             recipeFilter.addEventListener('input', function() {
                 const filterText = this.value;
+                const savedPage = currentPage;
                 filteredRecipes = filterRecipes(allRecipes, filterText, selectedTagIds, includeUntagged, selectedStates);
-                currentPage = 1; // Reset to first page when filtering
+                // Preserve page if possible, otherwise reset to 1
+                const totalPages = Math.max(1, Math.ceil(filteredRecipes.length / pageSize));
+                if (savedPage <= totalPages) {
+                    currentPage = savedPage;
+                } else {
+                    currentPage = 1;
+                }
                 displayRecipes(filteredRecipes);
+                saveViewState();
             });
         }
 
@@ -2115,10 +2190,18 @@
 
         function applyTagFilter() {
             const filterText = recipeFilter ? recipeFilter.value : '';
+            const savedPage = currentPage;
             filteredRecipes = filterRecipes(allRecipes, filterText, selectedTagIds, includeUntagged, selectedStates);
-            currentPage = 1; // Reset to first page when filtering
+            // Preserve page if possible, otherwise reset to 1
+            const totalPages = Math.max(1, Math.ceil(filteredRecipes.length / pageSize));
+            if (savedPage <= totalPages) {
+                currentPage = savedPage;
+            } else {
+                currentPage = 1;
+            }
             displayRecipes(filteredRecipes);
             updateTagFilterToggleText();
+            saveViewState();
         }
 
         // State filter functions
@@ -2177,10 +2260,18 @@
 
         function applyStateFilter() {
             const filterText = recipeFilter ? recipeFilter.value : '';
+            const savedPage = currentPage;
             filteredRecipes = filterRecipes(allRecipes, filterText, selectedTagIds, includeUntagged, selectedStates);
-            currentPage = 1; // Reset to first page when filtering
+            // Preserve page if possible, otherwise reset to 1
+            const totalPages = Math.max(1, Math.ceil(filteredRecipes.length / pageSize));
+            if (savedPage <= totalPages) {
+                currentPage = savedPage;
+            } else {
+                currentPage = 1;
+            }
             displayRecipes(filteredRecipes);
             updateStateFilterToggleText();
+            saveViewState();
         }
 
         // Tag filter UI event handlers
@@ -2515,6 +2606,7 @@
                 displayRecipes(filteredRecipes);
                 // Scroll to top of table
                 document.getElementById('recipesTableContainer').scrollIntoView({ behavior: 'smooth', block: 'start' });
+                saveViewState();
             }
         }
 
@@ -2525,6 +2617,7 @@
                 currentPage = totalPages;
             }
             displayRecipes(filteredRecipes);
+            saveViewState();
         }
 
         // Pagination event handlers
@@ -3371,8 +3464,18 @@
                 }
                 
                 // Reload recipes to update the view tab (this will update thumbnails with new rotation)
+                // Preserve current page and filters
                 if (document.getElementById('view-tab').classList.contains('active')) {
-                    loadRecipes();
+                    // Save current state before reloading
+                    const savedPage = currentPage;
+                    const savedFilterText = recipeFilter ? recipeFilter.value : '';
+                    await loadRecipes();
+                    // Restore page if still valid
+                    const totalPages = Math.max(1, Math.ceil(filteredRecipes.length / pageSize));
+                    if (savedPage <= totalPages) {
+                        currentPage = savedPage;
+                        displayRecipes(filteredRecipes);
+                    }
                 }
             } catch (error) {
                 console.error('Error updating rotation:', error);
