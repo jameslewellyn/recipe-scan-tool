@@ -43,6 +43,7 @@ Stores images extracted from PDF pages. Each page of a PDF gets one RecipeImage 
 | `medium_image_sha256`  | VARCHAR(64) (Indexed)                      | SHA256 hash of the medium image                        |
 | `thumbnail_data`       | BLOB                                       | Thumbnail version of the image (max 200px)             |
 | `thumbnail_sha256`     | VARCHAR(64) (Indexed)                      | SHA256 hash of the thumbnail                           |
+| `unneeded`             | BOOLEAN                                    | Flag to mark image as unneeded (default: false)        |
 
 ---
 

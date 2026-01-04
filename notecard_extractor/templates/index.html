@@ -603,6 +603,35 @@
             text-align: center;
         }
 
+        .edit-modal-unneeded-checkbox-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 0 10px;
+            border-left: 1px solid rgba(255, 255, 255, 0.3);
+            border-right: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .edit-modal-unneeded-checkbox-label {
+            color: white;
+            font-size: 0.9em;
+            font-weight: 500;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .edit-modal-unneeded-checkbox {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: #667eea;
+        }
+
+        .edit-modal-image-section img.image-unneeded {
+            opacity: 0.5;
+            filter: grayscale(0.3);
+        }
+
         .edit-modal-form-section {
             flex: 0 0 50%;
             padding: 40px;
@@ -916,6 +945,7 @@
             z-index: 10;
             margin-top: auto;
             margin-bottom: 20px;
+            pointer-events: auto;
         }
 
         .rotation-button {
@@ -949,6 +979,58 @@
             font-weight: 600;
             min-width: 80px;
             text-align: center;
+        }
+
+        .unneeded-checkbox-wrapper {
+            display: flex !important;
+            align-items: center;
+            gap: 8px;
+            padding: 0 10px;
+            border-left: 1px solid rgba(255, 255, 255, 0.3);
+            border-right: 1px solid rgba(255, 255, 255, 0.3);
+            pointer-events: auto !important;
+            position: relative;
+            z-index: 20;
+            min-height: 18px;
+            height: auto;
+        }
+
+        .unneeded-checkbox-label {
+            color: white;
+            font-size: 0.95em;
+            font-weight: 500;
+            cursor: pointer;
+            user-select: none;
+            pointer-events: auto !important;
+            flex-shrink: 0;
+            display: block;
+            padding: 2px 0;
+            min-width: 80px;
+        }
+
+        .unneeded-checkbox {
+            width: 18px !important;
+            height: 18px !important;
+            min-width: 18px !important;
+            min-height: 18px !important;
+            cursor: pointer !important;
+            accent-color: #667eea;
+            pointer-events: auto !important;
+            position: relative !important;
+            z-index: 25 !important;
+            flex-shrink: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            display: inline-block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            -webkit-appearance: checkbox !important;
+            appearance: checkbox !important;
+        }
+
+        .image-unneeded {
+            opacity: 0.5;
+            filter: grayscale(0.3);
         }
 
         .image-nav-arrow {
@@ -1578,6 +1660,10 @@
                             <div class="edit-modal-rotate-btn" id="editModalRotateCCW" title="Rotate counter-clockwise">↶</div>
                             <div class="edit-modal-rotate-display" id="editModalRotationDisplay">0°</div>
                             <div class="edit-modal-rotate-btn" id="editModalRotateCW" title="Rotate clockwise">↷</div>
+                            <div class="edit-modal-unneeded-checkbox-wrapper">
+                                <input type="checkbox" id="editModalUnneededCheckbox" class="edit-modal-unneeded-checkbox" title="Mark image as unneeded">
+                                <label for="editModalUnneededCheckbox" class="edit-modal-unneeded-checkbox-label">Unneeded</label>
+                            </div>
                         </div>
                     </div>
                     <div id="editModalImagePlaceholder" style="color: #999; text-align: center;">Loading image...</div>
@@ -1606,6 +1692,10 @@
                     <div class="rotation-button" id="rotateCounterClockwise" title="Rotate counter-clockwise">↶</div>
                     <div class="rotation-display" id="rotationDisplay">0°</div>
                     <div class="rotation-button" id="rotateClockwise" title="Rotate clockwise">↷</div>
+                    <div class="unneeded-checkbox-wrapper">
+                        <input type="checkbox" id="unneededCheckbox" class="unneeded-checkbox" title="Mark image as unneeded" style="display: block !important; visibility: visible !important; opacity: 1 !important;">
+                        <label for="unneededCheckbox" class="unneeded-checkbox-label">Unneeded</label>
+                    </div>
                 </div>
             </div>
         </div>
@@ -2947,11 +3037,15 @@
                                 <div class="detail-label" style="grid-column: 1 / -1; margin-top: ${index > 0 ? '15px' : '0'}; font-weight: 600; color: #667eea; border-top: ${index > 0 ? '1px solid #e0e0e0' : 'none'}; padding-top: ${index > 0 ? '10px' : '0'}; display: flex; align-items: center; gap: 15px;">
                                     <span>Page ${pageNum}:</span>
                                     <div style="width: 100px; height: 100px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
-                                        <img src="/api/recipe/${recipeId}/page/${page.pdf_page_number}/thumbnail" alt="Page ${pageNum} thumbnail" class="thumbnail-clickable" data-recipe-id="${recipeId}" data-image-type="page" data-page-number="${page.pdf_page_number}" style="max-width: 100px; max-height: 100px; width: auto; height: auto; object-fit: contain; border-radius: 4px; border: 1px solid #e0e0e0; transform: rotate(${page.rotation}deg); cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;" onerror="this.style.display='none';" onmouseover="this.style.boxShadow='0 4px 8px rgba(0,0,0,0.2)';" onmouseout="this.style.boxShadow='';">
+                                        <img src="/api/recipe/${recipeId}/page/${page.pdf_page_number}/thumbnail" alt="Page ${pageNum} thumbnail" class="thumbnail-clickable ${page.unneeded ? 'image-unneeded' : ''}" data-recipe-id="${recipeId}" data-image-type="page" data-page-number="${page.pdf_page_number}" style="max-width: 100px; max-height: 100px; width: auto; height: auto; object-fit: contain; border-radius: 4px; border: 1px solid #e0e0e0; transform: rotate(${page.rotation}deg); cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;" onerror="this.style.display='none';" onmouseover="this.style.boxShadow='0 4px 8px rgba(0,0,0,0.2)';" onmouseout="this.style.boxShadow='';">
                                     </div>
                                 </div>
                                 <div class="detail-label">Rotation:</div>
                                 <div class="detail-value">${page.rotation}°</div>
+                                <div class="detail-label">Unneeded:</div>
+                                <div class="detail-value">
+                                    <input type="checkbox" class="admin-unneeded-checkbox" data-recipe-id="${recipeId}" data-page-number="${page.pdf_page_number}" ${page.unneeded ? 'checked' : ''} title="Mark image as unneeded">
+                                </div>
                                 <div class="detail-label">Cropped Image SHA256:</div>
                                 <div class="detail-value">${page.cropped_image_sha256 || '<span class="empty">Not available</span>'}</div>
                                 <div class="detail-label">Cropped Image Size:</div>
@@ -3060,6 +3154,45 @@
                                 } else {
                                     showImagePreview(recipeId);
                                 }
+                            }
+                        });
+                    });
+                    
+                    // Add event handlers for admin unneeded checkboxes
+                    detailGrid.querySelectorAll('.admin-unneeded-checkbox').forEach(checkbox => {
+                        checkbox.addEventListener('change', async function(e) {
+                            e.stopPropagation();
+                            const recipeId = parseInt(this.getAttribute('data-recipe-id'), 10);
+                            const pageNumber = parseInt(this.getAttribute('data-page-number'), 10);
+                            const unneeded = this.checked;
+                            
+                            try {
+                                const response = await fetch(`/api/recipe/${recipeId}/page/${pageNumber}/unneeded`, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                    },
+                                    body: JSON.stringify({ unneeded: unneeded })
+                                });
+
+                                if (!response.ok) {
+                                    const data = await response.json();
+                                    throw new Error(data.error || 'Failed to update unneeded status');
+                                }
+
+                                // Update the thumbnail image style
+                                const thumbnail = detailGrid.querySelector(`.thumbnail-clickable[data-page-number="${pageNumber}"]`);
+                                if (thumbnail) {
+                                    if (unneeded) {
+                                        thumbnail.classList.add('image-unneeded');
+                                    } else {
+                                        thumbnail.classList.remove('image-unneeded');
+                                    }
+                                }
+                            } catch (error) {
+                                console.error('Error updating unneeded status:', error);
+                                // Revert checkbox
+                                this.checked = !unneeded;
                             }
                         });
                     });
@@ -3219,6 +3352,7 @@
         let currentGroupType = null; // 'recipe' or 'dish'
         let imageOverlayZoomed = false;
         let imageOverlayTransform = { x: 0, y: 0, scale: 1 };
+        let currentUnneeded = false;
 
         function showImagePreview(recipeId, imageType = 'recipe', pageNumber = null, dishNumber = null) {
             // Convert recipeId to number for comparison
@@ -3302,12 +3436,14 @@
                 currentPageNumber = page.pdf_page_number;
                 imageUrl = `/api/recipe/${recipeIdNum}/page/${page.pdf_page_number}/image`;
                 rotation = page.rotation || 0;
+                currentUnneeded = page.unneeded || false;
                 console.log('Loading recipe page image:', imageUrl, 'page number:', page.pdf_page_number);
             } else if (currentGroupType === 'dish' && currentImageGroup.length > 0 && currentImageIndex >= 0 && currentImageIndex < currentImageGroup.length) {
                 const dishImg = currentImageGroup[currentImageIndex];
                 currentDishNumber = dishImg.image_number;
                 imageUrl = `/api/recipe/${recipeIdNum}/dish/${dishImg.image_number}/image`;
                 rotation = dishImg.rotation || 0;
+                currentUnneeded = false; // Dish images don't have unneeded field
                 console.log('Loading dish image:', imageUrl, 'dish number:', dishImg.image_number);
             } else {
                 // Default to recipe page 1
@@ -3315,6 +3451,9 @@
                 if (recipeData && recipeData.pages && recipeData.pages.length > 0) {
                     const page = recipeData.pages[0];
                     rotation = page.rotation || 0;
+                    currentUnneeded = page.unneeded || false;
+                } else {
+                    currentUnneeded = false;
                 }
                 console.log('Loading default recipe image:', imageUrl);
             }
@@ -3325,6 +3464,8 @@
             imageOverlayTransform = { x: 0, y: 0, scale: 1 };
             updateRotationDisplay();
             updateImageOverlayTransform();
+            updateUnneededCheckbox();
+            updateImageUnneededStyle();
             
             previewImage.onerror = function() {
                 this.onerror = null;
@@ -3500,11 +3641,103 @@
             rotateImage('counterclockwise');
         });
 
+        // Unneeded checkbox handler - set up at page load like rotation buttons
+        const unneededCheckbox = document.getElementById('unneededCheckbox');
+        if (unneededCheckbox) {
+            // Use mousedown with capture phase to stop propagation BEFORE drag handler
+            // Don't preventDefault - let checkbox toggle naturally
+            unneededCheckbox.addEventListener('mousedown', function(e) {
+                e.stopPropagation();
+            }, true);
+            
+            // Handle click like rotation buttons do - use capture phase to ensure it fires
+            unneededCheckbox.addEventListener('click', function(e) {
+                e.stopPropagation();
+                // Checkbox toggles naturally, then update status
+                updateUnneededStatus(this.checked);
+            }, true);
+            
+            // Also handle change event as backup
+            unneededCheckbox.addEventListener('change', function(e) {
+                e.stopPropagation();
+                updateUnneededStatus(this.checked);
+            });
+            
+            // Handle label clicks too - label clicks naturally trigger checkbox
+            const unneededCheckboxLabel = document.querySelector('label[for="unneededCheckbox"]');
+            if (unneededCheckboxLabel) {
+                unneededCheckboxLabel.addEventListener('mousedown', function(e) {
+                    e.stopPropagation();
+                }, true);
+                unneededCheckboxLabel.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    // Manually toggle checkbox if label is clicked (in case checkbox is hidden)
+                    if (unneededCheckbox) {
+                        unneededCheckbox.checked = !unneededCheckbox.checked;
+                        updateUnneededStatus(unneededCheckbox.checked);
+                    }
+                });
+            }
+        }
+
+        function updateUnneededCheckbox() {
+            const checkbox = document.getElementById('unneededCheckbox');
+            if (checkbox) {
+                checkbox.checked = currentUnneeded;
+                // Only show checkbox for recipe page images
+                checkbox.disabled = currentImageType !== 'page' || currentPageNumber === null;
+            }
+        }
+
+        function updateImageUnneededStyle() {
+            if (previewImage) {
+                if (currentUnneeded && currentImageType === 'page') {
+                    previewImage.classList.add('image-unneeded');
+                } else {
+                    previewImage.classList.remove('image-unneeded');
+                }
+            }
+        }
+
+        async function updateUnneededStatus(unneeded) {
+            if (!currentRecipeId || currentImageType !== 'page' || currentPageNumber === null) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/recipe/${currentRecipeId}/page/${currentPageNumber}/unneeded`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ unneeded: unneeded })
+                });
+
+                if (!response.ok) {
+                    const data = await response.json();
+                    throw new Error(data.error || 'Failed to update unneeded status');
+                }
+
+                currentUnneeded = unneeded;
+                updateImageUnneededStyle();
+                
+                // Update the current image group data
+                if (currentImageGroup.length > 0 && currentImageIndex >= 0 && currentImageIndex < currentImageGroup.length) {
+                    currentImageGroup[currentImageIndex].unneeded = unneeded;
+                }
+            } catch (error) {
+                console.error('Error updating unneeded status:', error);
+                // Revert checkbox
+                updateUnneededCheckbox();
+            }
+        }
+
         function hideImagePreview() {
             imageOverlay.classList.remove('active');
             previewImage.src = '';
             previewImage.style.transform = '';
             previewImage.style.transformOrigin = 'center center';
+            previewImage.classList.remove('image-unneeded');
             currentRecipeId = null;
             currentRotation = 0;
             currentImageType = null;
@@ -3515,6 +3748,7 @@
             currentGroupType = null;
             imageOverlayZoomed = false;
             imageOverlayTransform = { x: 0, y: 0, scale: 1 };
+            currentUnneeded = false;
             document.getElementById('imageNavLeft').style.display = 'none';
             document.getElementById('imageNavRight').style.display = 'none';
         }
@@ -3575,11 +3809,19 @@
             let hasDragged = false;
             
             imageOverlayContent.addEventListener('mousedown', function(e) {
-                // Don't handle if clicking on controls, navigation, or close button
-                if (e.target.closest('.image-nav-arrow') || 
+                // Don't handle if clicking on controls, navigation, close button, or unneeded checkbox
+                // Check for checkbox first, before anything else
+                if (e.target.id === 'unneededCheckbox' || 
+                    e.target.closest('#unneededCheckbox') ||
+                    e.target.closest('label[for="unneededCheckbox"]') ||
+                    e.target.closest('.unneeded-checkbox-wrapper') ||
+                    e.target.closest('.image-nav-arrow') || 
                     e.target.closest('.rotation-controls') ||
+                    e.target.closest('.unneeded-checkbox') ||
+                    e.target.closest('.unneeded-checkbox-label') ||
                     e.target.closest('.image-overlay-close') ||
                     e.target.closest('.image-overlay-title')) {
+                    // Don't prevent default for these elements - let them handle their own events
                     return;
                 }
                 
@@ -3621,6 +3863,23 @@
             });
             
             imageOverlayContent.addEventListener('mouseup', function(e) {
+                // First check if clicking on checkbox or controls - exit early before checking isDragging
+                if (e.target.id === 'unneededCheckbox' || 
+                    e.target.closest('#unneededCheckbox') ||
+                    e.target.closest('label[for="unneededCheckbox"]') ||
+                    e.target.closest('.unneeded-checkbox-wrapper') ||
+                    e.target.closest('.image-nav-arrow') || 
+                    e.target.closest('.rotation-controls') ||
+                    e.target.closest('.unneeded-checkbox') ||
+                    e.target.closest('.unneeded-checkbox-label') ||
+                    e.target.closest('.image-overlay-close') ||
+                    e.target.closest('.image-overlay-title')) {
+                    // Reset dragging state and let the element handle its own click
+                    isDragging = false;
+                    hasDragged = false;
+                    return;
+                }
+                
                 if (!isDragging) return;
                 
                 // If it was a drag, don't toggle zoom
@@ -3632,15 +3891,6 @@
                 
                 // If it was just a click (no drag), toggle zoom
                 if (!imageOverlayZoomed) {
-                    // Don't zoom if clicking on controls, navigation, or close button
-                    if (e.target.closest('.image-nav-arrow') || 
-                        e.target.closest('.rotation-controls') ||
-                        e.target.closest('.image-overlay-close') ||
-                        e.target.closest('.image-overlay-title')) {
-                        isDragging = false;
-                        hasDragged = false;
-                        return;
-                    }
                     toggleImageOverlayZoom();
                 } else {
                     // If already zoomed and it's a click (not drag), zoom out
@@ -3720,7 +3970,8 @@
                         editModalImages.push({
                             type: 'page',
                             number: page.pdf_page_number,
-                            rotation: page.rotation || 0
+                            rotation: page.rotation || 0,
+                            unneeded: page.unneeded || false
                         });
                     });
                 }
@@ -3857,6 +4108,8 @@
             // Show controls
             controls.style.display = 'flex';
             updateEditModalRotationDisplay();
+            updateEditModalUnneededCheckbox();
+            updateEditModalImageUnneededStyle();
             
             // Load image
             image.src = imageUrl;
@@ -3893,6 +4146,57 @@
             const display = document.getElementById('editModalRotationDisplay');
             if (display) {
                 display.textContent = `${editModalCurrentRotation}°`;
+            }
+        }
+
+        function updateEditModalUnneededCheckbox() {
+            const checkbox = document.getElementById('editModalUnneededCheckbox');
+            if (checkbox && editModalImages.length > 0 && editModalCurrentIndex >= 0) {
+                const imageData = editModalImages[editModalCurrentIndex];
+                checkbox.checked = imageData.unneeded || false;
+                // Only enable checkbox for page images
+                checkbox.disabled = imageData.type !== 'page';
+            }
+        }
+
+        function updateEditModalImageUnneededStyle() {
+            const image = document.getElementById('editModalImage');
+            if (image && editModalImages.length > 0 && editModalCurrentIndex >= 0) {
+                const imageData = editModalImages[editModalCurrentIndex];
+                if (imageData.unneeded && imageData.type === 'page') {
+                    image.classList.add('image-unneeded');
+                } else {
+                    image.classList.remove('image-unneeded');
+                }
+            }
+        }
+
+        async function updateEditModalUnneededStatus(unneeded) {
+            if (!editModalRecipeId || editModalImages.length === 0) return;
+            
+            const imageData = editModalImages[editModalCurrentIndex];
+            if (imageData.type !== 'page') return;
+
+            try {
+                const response = await fetch(`/api/recipe/${editModalRecipeId}/page/${imageData.number}/unneeded`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ unneeded: unneeded })
+                });
+
+                if (!response.ok) {
+                    const data = await response.json();
+                    throw new Error(data.error || 'Failed to update unneeded status');
+                }
+
+                imageData.unneeded = unneeded;
+                updateEditModalImageUnneededStyle();
+            } catch (error) {
+                console.error('Error updating unneeded status:', error);
+                // Revert checkbox
+                updateEditModalUnneededCheckbox();
             }
         }
 
@@ -4144,6 +4448,15 @@
                 updateEditModalImageTransform();
                 updateEditModalRotationDisplay();
                 await saveEditModalRotation();
+            });
+        }
+
+        // Edit modal unneeded checkbox handler
+        const editModalUnneededCheckbox = document.getElementById('editModalUnneededCheckbox');
+        if (editModalUnneededCheckbox) {
+            editModalUnneededCheckbox.addEventListener('change', function(e) {
+                e.stopPropagation();
+                updateEditModalUnneededStatus(this.checked);
             });
         }
         

@@ -274,6 +274,7 @@ def upload_pdfs():
                             medium_image_sha256=medium_image_hash,
                             thumbnail_data=thumbnail_data,
                             thumbnail_sha256=thumbnail_hash,
+                            unneeded=False,
                         )
 
                         session.add(recipe_image)
@@ -438,6 +439,7 @@ def get_recipe(recipe_id: int):
                     {
                         "pdf_page_number": img.pdf_page_number,
                         "rotation": img.rotation,
+                        "unneeded": img.unneeded,
                         "cropped_image_sha256": img.cropped_image_sha256,
                         "cropped_image_size": len(img.cropped_image_data)
                         if img.cropped_image_data
@@ -954,6 +956,51 @@ def update_recipe_rotation(recipe_id: int):
 
             session.commit()
             return jsonify({"success": True, "rotation": rotation})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@flask_app.route("/api/recipe/<int:recipe_id>/page/<int:page_number>/unneeded", methods=["POST"])
+def update_recipe_image_unneeded(recipe_id: int, page_number: int):
+    """
+    Update the unneeded flag for a specific recipe image page.
+    Expects JSON: {"unneeded": true|false}
+    """
+    if db_engine is None:
+        return jsonify({"error": "Database not initialized"}), 500
+
+    try:
+        data = request.get_json()
+        if not data or "unneeded" not in data:
+            return jsonify({"error": "Missing unneeded in request"}), 400
+
+        unneeded = bool(data["unneeded"])
+
+        with Session(db_engine) as session:
+            recipe = session.get(Recipe, recipe_id)
+
+            if not recipe:
+                return jsonify({"error": "Recipe not found"}), 404
+
+            # Get the specific page image
+            recipe_image = (
+                session.query(RecipeImage)
+                .filter(RecipeImage.recipe_id == recipe_id)
+                .filter(RecipeImage.pdf_page_number == page_number)
+                .first()
+            )
+            
+            if not recipe_image:
+                return jsonify(
+                    {"error": f"No image found for page {page_number + 1}"}
+                ), 404
+            
+            recipe_image.unneeded = unneeded
+            session.add(recipe_image)
+            session.commit()
+            
+            return jsonify({"success": True, "unneeded": unneeded})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500

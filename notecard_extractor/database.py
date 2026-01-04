@@ -99,6 +99,9 @@ class RecipeImage(SQLModel, table=True):
     thumbnail_data: Optional[bytes] = Field(default=None, sa_column=Column(LargeBinary))
     thumbnail_sha256: Optional[str] = Field(default=None, index=True, max_length=64)
 
+    # Flag to mark image as unneeded
+    unneeded: bool = Field(default=False)
+
 
 class DishImage(SQLModel, table=True):
     """
