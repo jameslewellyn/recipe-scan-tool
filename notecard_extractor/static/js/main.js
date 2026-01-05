@@ -1730,6 +1730,7 @@
             if (currentGroupType === 'recipe' && currentImageGroup.length > 0 && currentImageIndex >= 0 && currentImageIndex < currentImageGroup.length) {
                 const page = currentImageGroup[currentImageIndex];
                 currentPageNumber = page.pdf_page_number;
+                currentImageType = 'page'; // Update image type to 'page' when loading a recipe page
                 imageUrl = `/api/recipe/${recipeIdNum}/page/${page.pdf_page_number}/image`;
                 rotation = page.rotation || 0;
                 currentUnneeded = page.unneeded || false;
@@ -1737,6 +1738,7 @@
             } else if (currentGroupType === 'dish' && currentImageGroup.length > 0 && currentImageIndex >= 0 && currentImageIndex < currentImageGroup.length) {
                 const dishImg = currentImageGroup[currentImageIndex];
                 currentDishNumber = dishImg.image_number;
+                currentImageType = 'dish'; // Update image type to 'dish' when loading a dish image
                 imageUrl = `/api/recipe/${recipeIdNum}/dish/${dishImg.image_number}/image`;
                 rotation = dishImg.rotation || 0;
                 currentUnneeded = false; // Dish images don't have unneeded field
@@ -1756,12 +1758,19 @@
             
             currentRotation = rotation;
             // Reset zoom and position when loading new image
-            imageOverlayZoomed = false;
-            imageOverlayTransform = { x: 0, y: 0, scale: 1 };
-            updateRotationDisplay();
-            updateImageOverlayTransform();
-            updateUnneededCheckbox();
-            updateImageUnneededStyle();
+            if (imageOverlayModal) {
+                imageOverlayModal.reset();
+                imageOverlayModal.updateRotationDisplay();
+                imageOverlayModal.updateUnneededCheckbox();
+                imageOverlayModal.updateImageUnneededStyle();
+            } else {
+                imageOverlayZoomed = false;
+                imageOverlayTransform = { x: 0, y: 0, scale: 1 };
+                updateRotationDisplay();
+                updateImageOverlayTransform();
+                updateUnneededCheckbox();
+                updateImageUnneededStyle();
+            }
             
             previewImage.onerror = function() {
                 this.onerror = null;
@@ -1770,6 +1779,11 @@
             };
             previewImage.src = imageUrl;
             imageOverlay.classList.add('active');
+            
+            // Ensure ImageModal handlers are initialized now that overlay is visible
+            if (imageOverlayModal) {
+                imageOverlayModal.ensureInitialized();
+            }
         }
         
         function updateNavigationArrows() {
@@ -1833,52 +1847,49 @@
 
         function updateImageOverlayTransform() {
             updateImageRotation();
-            const content = document.querySelector('.image-overlay-content');
-            if (content) {
-                if (imageOverlayZoomed) {
-                    content.classList.add('zoomed');
-                    previewImage.classList.add('zoomed');
-                } else {
-                    content.classList.remove('zoomed');
-                    previewImage.classList.remove('zoomed');
+            // ImageModal handles zoom/pan transform, but we still need to apply rotation
+            if (imageOverlayModal) {
+                // ImageModal handles its own transform, but we need to sync rotation
+                const rotation = currentRotation || 0;
+                if (previewImage) {
+                    const transform = previewImage.style.transform || '';
+                    // Extract scale and translate from existing transform if present
+                    const scaleMatch = transform.match(/scale\(([^)]+)\)/);
+                    const translateMatch = transform.match(/translate\(([^)]+)\)/);
+                    const scale = scaleMatch ? scaleMatch[1] : '1';
+                    const translate = translateMatch ? translateMatch[1] : '0px, 0px';
+                    previewImage.style.transform = `translate(${translate}) scale(${scale}) rotate(${rotation}deg)`;
+                    previewImage.style.transformOrigin = 'center center';
+                }
+            } else {
+                // Fallback for when modal isn't initialized
+                const content = document.querySelector('.image-overlay-content');
+                if (content) {
+                    if (imageOverlayZoomed) {
+                        content.classList.add('zoomed');
+                        previewImage.classList.add('zoomed');
+                    } else {
+                        content.classList.remove('zoomed');
+                        previewImage.classList.remove('zoomed');
+                    }
                 }
             }
         }
 
-        function toggleImageOverlayZoom() {
-            imageOverlayZoomed = !imageOverlayZoomed;
-            
-            if (imageOverlayZoomed) {
-                imageOverlayTransform.scale = 2;
-            } else {
-                imageOverlayTransform.scale = 1;
-                imageOverlayTransform.x = 0;
-                imageOverlayTransform.y = 0;
-            }
-            
-            updateImageOverlayTransform();
-        }
-
-        async function rotateImage(direction) {
+        async function rotateImageToValue(rotation) {
             if (!currentRecipeId) return;
             
-            // Ensure currentRotation is a number
-            currentRotation = parseInt(currentRotation, 10) || 0;
-            
-            // Calculate new rotation
-            if (direction === 'clockwise') {
-                currentRotation = (currentRotation + 90) % 360;
-            } else {
-                currentRotation = (currentRotation - 90 + 360) % 360;
-            }
-            
             // Update display immediately for responsive UI
-            updateRotationDisplay();
+            if (imageOverlayModal) {
+                imageOverlayModal.updateRotationDisplay();
+            } else {
+                updateRotationDisplay();
+            }
             updateImageOverlayTransform();
             
             // Update database
             try {
-                const rotationData = { rotation: currentRotation };
+                const rotationData = { rotation: rotation };
                 if (currentImageType === 'page' && currentPageNumber !== null) {
                     rotationData.image_type = 'page';
                     rotationData.page_number = currentPageNumber;
@@ -1916,89 +1927,133 @@
                 }
             } catch (error) {
                 console.error('Error updating rotation:', error);
-                // Revert on error
-                if (direction === 'clockwise') {
-                    currentRotation = (currentRotation - 90 + 360) % 360;
-                } else {
-                    currentRotation = (currentRotation + 90) % 360;
-                }
-                updateRotationDisplay();
-                updateImageOverlayTransform();
+                // Revert on error - reload the current image to get the correct rotation
+                await loadCurrentImage(null);
             }
         }
 
-        rotateClockwise.addEventListener('click', function(e) {
-            e.stopPropagation();
-            rotateImage('clockwise');
-        });
-
-        rotateCounterClockwise.addEventListener('click', function(e) {
-            e.stopPropagation();
-            rotateImage('counterclockwise');
-        });
-
-        // Unneeded checkbox handler - set up at page load like rotation buttons
-        const unneededCheckbox = document.getElementById('unneededCheckbox');
-        if (unneededCheckbox) {
-            // Use mousedown with capture phase to stop propagation BEFORE drag handler
-            // Don't preventDefault - let checkbox toggle naturally
-            unneededCheckbox.addEventListener('mousedown', function(e) {
-                e.stopPropagation();
-            }, true);
+        // Initialize ImageModal instances after DOM is ready
+        function initImageModals() {
+            // Image overlay modal
+            if (!imageOverlayModal) {
+                imageOverlayModal = new ImageModal({
+                    container: '.image-overlay-content',
+                    imageElement: '#previewImage',
+                    checkboxId: 'unneededCheckbox',
+                    checkboxLabelSelector: 'label[for="unneededCheckbox"]',
+                    rotationDisplayId: 'rotationDisplay',
+                    rotateCCWId: 'rotateCounterClockwise',
+                    rotateCWId: 'rotateClockwise',
+                    onRotationChange: async (newRotation) => {
+                        currentRotation = newRotation;
+                        await rotateImageToValue(newRotation);
+                    },
+                    onUnneededChange: async (unneeded) => {
+                        await updateUnneededStatus(unneeded);
+                    },
+                    getCurrentRotation: () => currentRotation,
+                    getCurrentUnneeded: () => currentUnneeded,
+                    shouldDisableCheckbox: () => currentImageType !== 'page' || currentPageNumber === null,
+                    canRotate: true,
+                    canToggleUnneeded: true,
+                    enableZoom: true,
+                    enablePan: true,
+                });
+            }
             
-            // Handle click like rotation buttons do - use capture phase to ensure it fires
-            unneededCheckbox.addEventListener('click', function(e) {
-                e.stopPropagation();
-                // Checkbox toggles naturally, then update status
-                updateUnneededStatus(this.checked);
-            }, true);
-            
-            // Also handle change event as backup
-            unneededCheckbox.addEventListener('change', function(e) {
-                e.stopPropagation();
-                updateUnneededStatus(this.checked);
-            });
-            
-            // Handle label clicks too - label clicks naturally trigger checkbox
-            const unneededCheckboxLabel = document.querySelector('label[for="unneededCheckbox"]');
-            if (unneededCheckboxLabel) {
-                unneededCheckboxLabel.addEventListener('mousedown', function(e) {
-                    e.stopPropagation();
-                }, true);
-                unneededCheckboxLabel.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    // Manually toggle checkbox if label is clicked (in case checkbox is hidden)
-                    if (unneededCheckbox) {
-                        unneededCheckbox.checked = !unneededCheckbox.checked;
-                        updateUnneededStatus(unneededCheckbox.checked);
-                    }
+            // Edit modal
+            if (!editModalImageModal) {
+                editModalImageModal = new ImageModal({
+                    container: '#editModalImageContainer',
+                    imageElement: '#editModalImage',
+                    checkboxId: 'editModalUnneededCheckbox',
+                    checkboxLabelSelector: 'label[for="editModalUnneededCheckbox"]',
+                    rotationDisplayId: 'editModalRotationDisplay',
+                    rotateCCWId: 'editModalRotateCCW',
+                    rotateCWId: 'editModalRotateCW',
+                    onRotationChange: async (newRotation) => {
+                        editModalCurrentRotation = newRotation;
+                        await saveEditModalRotation();
+                    },
+                    onUnneededChange: async (unneeded) => {
+                        await updateEditModalUnneededStatus(unneeded);
+                    },
+                    getCurrentRotation: () => editModalCurrentRotation || 0,
+                    getCurrentUnneeded: () => {
+                        if (editModalImages.length > 0 && editModalCurrentIndex >= 0) {
+                            const imageData = editModalImages[editModalCurrentIndex];
+                            return imageData.unneeded || false;
+                        }
+                        return false;
+                    },
+                    shouldDisableCheckbox: () => {
+                        if (editModalImages.length > 0 && editModalCurrentIndex >= 0) {
+                            const imageData = editModalImages[editModalCurrentIndex];
+                            return imageData.type !== 'page';
+                        }
+                        return true;
+                    },
+                    canRotate: true,
+                    canToggleUnneeded: true,
+                    enableZoom: true,
+                    enablePan: true,
                 });
             }
         }
+        
+        // Initialize on page load
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initImageModals);
+        } else {
+            initImageModals();
+        }
+
+        // Initialize ImageModal instances
+        let imageOverlayModal = null;
+        let editModalImageModal = null;
 
         function updateUnneededCheckbox() {
-            const checkbox = document.getElementById('unneededCheckbox');
-            if (checkbox) {
-                checkbox.checked = currentUnneeded;
-                // Only show checkbox for recipe page images
-                checkbox.disabled = currentImageType !== 'page' || currentPageNumber === null;
+            if (imageOverlayModal) {
+                imageOverlayModal.updateUnneededCheckbox();
+            } else {
+                const checkbox = document.getElementById('unneededCheckbox');
+                if (checkbox) {
+                    checkbox.checked = currentUnneeded;
+                    // Only show checkbox for recipe page images
+                    checkbox.disabled = currentImageType !== 'page' || currentPageNumber === null;
+                }
             }
         }
 
         function updateImageUnneededStyle() {
-            if (previewImage) {
-                if (currentUnneeded && currentImageType === 'page') {
-                    previewImage.classList.add('image-unneeded');
-                } else {
-                    previewImage.classList.remove('image-unneeded');
+            if (imageOverlayModal) {
+                imageOverlayModal.updateImageUnneededStyle();
+            } else {
+                if (previewImage) {
+                    if (currentUnneeded && currentImageType === 'page') {
+                        previewImage.classList.add('image-unneeded');
+                    } else {
+                        previewImage.classList.remove('image-unneeded');
+                    }
                 }
             }
         }
 
         async function updateUnneededStatus(unneeded) {
             if (!currentRecipeId || currentImageType !== 'page' || currentPageNumber === null) {
+                console.log('updateUnneededStatus: Skipping - invalid state', {
+                    currentRecipeId,
+                    currentImageType,
+                    currentPageNumber
+                });
                 return;
             }
+
+            console.log('updateUnneededStatus: Calling API', {
+                recipeId: currentRecipeId,
+                pageNumber: currentPageNumber,
+                unneeded: unneeded
+            });
 
             try {
                 const response = await fetch(`/api/recipe/${currentRecipeId}/page/${currentPageNumber}/unneeded`, {
@@ -2014,12 +2069,20 @@
                     throw new Error(data.error || 'Failed to update unneeded status');
                 }
 
+                const result = await response.json();
+                console.log('updateUnneededStatus: Success', result);
+
                 currentUnneeded = unneeded;
                 updateImageUnneededStyle();
                 
                 // Update the current image group data
                 if (currentImageGroup.length > 0 && currentImageIndex >= 0 && currentImageIndex < currentImageGroup.length) {
                     currentImageGroup[currentImageIndex].unneeded = unneeded;
+                }
+                
+                // Update modal checkbox state
+                if (imageOverlayModal) {
+                    imageOverlayModal.updateUnneededCheckbox();
                 }
             } catch (error) {
                 console.error('Error updating unneeded status:', error);
@@ -2094,109 +2157,8 @@
             }
         });
 
-        // Click to zoom and drag to pan functionality for image overlay
-        const imageOverlayContent = document.querySelector('.image-overlay-content');
-        if (imageOverlayContent && previewImage) {
-            let isDragging = false;
-            let dragStartX = 0;
-            let dragStartY = 0;
-            let dragStartPosX = 0;
-            let dragStartPosY = 0;
-            let hasDragged = false;
-            
-            imageOverlayContent.addEventListener('mousedown', function(e) {
-                // Don't handle if clicking on controls, navigation, close button, or unneeded checkbox
-                // Check for checkbox first, before anything else
-                if (e.target.id === 'unneededCheckbox' || 
-                    e.target.closest('#unneededCheckbox') ||
-                    e.target.closest('label[for="unneededCheckbox"]') ||
-                    e.target.closest('.unneeded-checkbox-wrapper') ||
-                    e.target.closest('.image-nav-arrow') || 
-                    e.target.closest('.rotation-controls') ||
-                    e.target.closest('.unneeded-checkbox') ||
-                    e.target.closest('.unneeded-checkbox-label') ||
-                    e.target.closest('.image-overlay-close') ||
-                    e.target.closest('.image-overlay-title')) {
-                    // Don't prevent default for these elements - let them handle their own events
-                    return;
-                }
-                
-                if (imageOverlayZoomed) {
-                    // Start drag
-                    isDragging = true;
-                    hasDragged = false;
-                    dragStartX = e.clientX;
-                    dragStartY = e.clientY;
-                    dragStartPosX = imageOverlayTransform.x;
-                    dragStartPosY = imageOverlayTransform.y;
-                    e.preventDefault();
-                } else {
-                    // Track for potential drag (even when not zoomed)
-                    isDragging = true;
-                    hasDragged = false;
-                    dragStartX = e.clientX;
-                    dragStartY = e.clientY;
-                }
-            });
-            
-            document.addEventListener('mousemove', function(e) {
-                if (!isDragging) return;
-                
-                const deltaX = Math.abs(e.clientX - dragStartX);
-                const deltaY = Math.abs(e.clientY - dragStartY);
-                
-                // If moved more than 5 pixels, consider it a drag
-                if (deltaX > 5 || deltaY > 5) {
-                    hasDragged = true;
-                }
-                
-                if (imageOverlayZoomed && hasDragged) {
-                    // Update pan position
-                    imageOverlayTransform.x = dragStartPosX + (e.clientX - dragStartX);
-                    imageOverlayTransform.y = dragStartPosY + (e.clientY - dragStartY);
-                    updateImageOverlayTransform();
-                }
-            });
-            
-            imageOverlayContent.addEventListener('mouseup', function(e) {
-                // First check if clicking on checkbox or controls - exit early before checking isDragging
-                if (e.target.id === 'unneededCheckbox' || 
-                    e.target.closest('#unneededCheckbox') ||
-                    e.target.closest('label[for="unneededCheckbox"]') ||
-                    e.target.closest('.unneeded-checkbox-wrapper') ||
-                    e.target.closest('.image-nav-arrow') || 
-                    e.target.closest('.rotation-controls') ||
-                    e.target.closest('.unneeded-checkbox') ||
-                    e.target.closest('.unneeded-checkbox-label') ||
-                    e.target.closest('.image-overlay-close') ||
-                    e.target.closest('.image-overlay-title')) {
-                    // Reset dragging state and let the element handle its own click
-                    isDragging = false;
-                    hasDragged = false;
-                    return;
-                }
-                
-                if (!isDragging) return;
-                
-                // If it was a drag, don't toggle zoom
-                if (hasDragged) {
-                    isDragging = false;
-                    hasDragged = false;
-                    return;
-                }
-                
-                // If it was just a click (no drag), toggle zoom
-                if (!imageOverlayZoomed) {
-                    toggleImageOverlayZoom();
-                } else {
-                    // If already zoomed and it's a click (not drag), zoom out
-                    toggleImageOverlayZoom();
-                }
-                
-                isDragging = false;
-                hasDragged = false;
-            });
-        }
+        // Zoom/pan functionality is now handled by ImageModal
+        // The old handlers are removed - ImageModal handles this
 
         // Event delegation for save buttons (works for dynamically added buttons)
         document.addEventListener('click', async function(e) {
@@ -2228,8 +2190,12 @@
             editModalRecipeId = recipeId;
             editModalImages = [];
             editModalCurrentIndex = 0;
-            editModalZoomed = false;
-            editModalImageTransform = { x: 0, y: 0, scale: 1 };
+            if (editModalImageModal) {
+                editModalImageModal.reset();
+            } else {
+                editModalZoomed = false;
+                editModalImageTransform = { x: 0, y: 0, scale: 1 };
+            }
             
             // Show modal
             modal.classList.add('active');
@@ -2387,8 +2353,12 @@
             }
             
             // Reset zoom and position
-            editModalZoomed = false;
-            editModalImageTransform = { x: 0, y: 0, scale: 1 };
+            if (editModalImageModal) {
+                editModalImageModal.reset();
+            } else {
+                editModalZoomed = false;
+                editModalImageTransform = { x: 0, y: 0, scale: 1 };
+            }
             editModalCurrentRotation = imageData.rotation || 0;
             updateEditModalImageTransform();
             
@@ -2407,6 +2377,14 @@
             updateEditModalUnneededCheckbox();
             updateEditModalImageUnneededStyle();
             
+            // Update ImageModal state
+            if (editModalImageModal) {
+                editModalImageModal.updateTransform();
+                editModalImageModal.updateRotationDisplay();
+                editModalImageModal.updateUnneededCheckbox();
+                editModalImageModal.updateImageUnneededStyle();
+            }
+            
             // Load image
             image.src = imageUrl;
             image.onload = function() {
@@ -2419,50 +2397,54 @@
         }
 
         function updateEditModalImageTransform() {
-            const image = document.getElementById('editModalImage');
-            const container = document.getElementById('editModalImageContainer');
-            
-            if (!image || !container) return;
-            
-            const rotation = editModalCurrentRotation || 0;
-            const scale = editModalImageTransform.scale;
-            const x = editModalImageTransform.x;
-            const y = editModalImageTransform.y;
-            
-            image.style.transform = `translate(${x}px, ${y}px) scale(${scale}) rotate(${rotation}deg)`;
-            
-            if (editModalZoomed) {
-                container.classList.add('zoomed');
+            if (editModalImageModal) {
+                editModalImageModal.updateTransform();
             } else {
-                container.classList.remove('zoomed');
+                // Fallback
+                const image = document.getElementById('editModalImage');
+                const container = document.getElementById('editModalImageContainer');
+                if (!image || !container) return;
+                const rotation = editModalCurrentRotation || 0;
+                image.style.transform = `rotate(${rotation}deg)`;
             }
         }
 
         function updateEditModalRotationDisplay() {
-            const display = document.getElementById('editModalRotationDisplay');
-            if (display) {
-                display.textContent = `${editModalCurrentRotation}°`;
+            if (editModalImageModal) {
+                editModalImageModal.updateRotationDisplay();
+            } else {
+                const display = document.getElementById('editModalRotationDisplay');
+                if (display) {
+                    display.textContent = `${editModalCurrentRotation}°`;
+                }
             }
         }
 
         function updateEditModalUnneededCheckbox() {
-            const checkbox = document.getElementById('editModalUnneededCheckbox');
-            if (checkbox && editModalImages.length > 0 && editModalCurrentIndex >= 0) {
-                const imageData = editModalImages[editModalCurrentIndex];
-                checkbox.checked = imageData.unneeded || false;
-                // Only enable checkbox for page images
-                checkbox.disabled = imageData.type !== 'page';
+            if (editModalImageModal) {
+                editModalImageModal.updateUnneededCheckbox();
+            } else {
+                const checkbox = document.getElementById('editModalUnneededCheckbox');
+                if (checkbox && editModalImages.length > 0 && editModalCurrentIndex >= 0) {
+                    const imageData = editModalImages[editModalCurrentIndex];
+                    checkbox.checked = imageData.unneeded || false;
+                    checkbox.disabled = imageData.type !== 'page';
+                }
             }
         }
 
         function updateEditModalImageUnneededStyle() {
-            const image = document.getElementById('editModalImage');
-            if (image && editModalImages.length > 0 && editModalCurrentIndex >= 0) {
-                const imageData = editModalImages[editModalCurrentIndex];
-                if (imageData.unneeded && imageData.type === 'page') {
-                    image.classList.add('image-unneeded');
-                } else {
-                    image.classList.remove('image-unneeded');
+            if (editModalImageModal) {
+                editModalImageModal.updateImageUnneededStyle();
+            } else {
+                const image = document.getElementById('editModalImage');
+                if (image && editModalImages.length > 0 && editModalCurrentIndex >= 0) {
+                    const imageData = editModalImages[editModalCurrentIndex];
+                    if (imageData.unneeded && imageData.type === 'page') {
+                        image.classList.add('image-unneeded');
+                    } else {
+                        image.classList.remove('image-unneeded');
+                    }
                 }
             }
         }
@@ -2489,6 +2471,9 @@
 
                 imageData.unneeded = unneeded;
                 updateEditModalImageUnneededStyle();
+                if (editModalImageModal) {
+                    editModalImageModal.updateUnneededCheckbox();
+                }
             } catch (error) {
                 console.error('Error updating unneeded status:', error);
                 // Revert checkbox
@@ -2496,30 +2481,20 @@
             }
         }
 
-        function toggleEditModalZoom() {
-            editModalZoomed = !editModalZoomed;
-            
-            if (editModalZoomed) {
-                editModalImageTransform.scale = 2;
-            } else {
-                editModalImageTransform.scale = 1;
-                editModalImageTransform.x = 0;
-                editModalImageTransform.y = 0;
-            }
-            
-            updateEditModalImageTransform();
-        }
-
         function closeEditModal() {
             const modal = document.getElementById('editModal');
             if (modal) {
                 modal.classList.remove('active');
                 // Reset state
-                editModalZoomed = false;
-                editModalImageTransform = { x: 0, y: 0, scale: 1 };
-                const container = document.getElementById('editModalImageContainer');
-                if (container) {
-                    container.classList.remove('zoomed');
+                if (editModalImageModal) {
+                    editModalImageModal.reset();
+                } else {
+                    editModalZoomed = false;
+                    editModalImageTransform = { x: 0, y: 0, scale: 1 };
+                    const container = document.getElementById('editModalImageContainer');
+                    if (container) {
+                        container.classList.remove('zoomed');
+                    }
                 }
             }
         }
@@ -2618,90 +2593,8 @@
             });
         }
         
-        // Drag to pan when zoomed and click to zoom
-        if (editModalImageContainer) {
-            let isDragging = false;
-            let dragStartX = 0;
-            let dragStartY = 0;
-            let dragStartPosX = 0;
-            let dragStartPosY = 0;
-            let hasDragged = false;
-            
-            editModalImageContainer.addEventListener('mousedown', function(e) {
-                // Don't handle if clicking on controls or navigation
-                if (e.target.closest('.edit-modal-image-nav') || 
-                    e.target.closest('.edit-modal-image-controls') ||
-                    e.target.closest('.edit-modal-rotate-btn')) {
-                    return;
-                }
-                
-                if (editModalZoomed) {
-                    // Start drag
-                    isDragging = true;
-                    hasDragged = false;
-                    dragStartX = e.clientX;
-                    dragStartY = e.clientY;
-                    dragStartPosX = editModalImageTransform.x;
-                    dragStartPosY = editModalImageTransform.y;
-                    e.preventDefault();
-                } else {
-                    // Track for potential drag (even when not zoomed)
-                    isDragging = true;
-                    hasDragged = false;
-                    dragStartX = e.clientX;
-                    dragStartY = e.clientY;
-                }
-            });
-            
-            document.addEventListener('mousemove', function(e) {
-                if (!isDragging) return;
-                
-                const deltaX = Math.abs(e.clientX - dragStartX);
-                const deltaY = Math.abs(e.clientY - dragStartY);
-                
-                // If moved more than 5 pixels, consider it a drag
-                if (deltaX > 5 || deltaY > 5) {
-                    hasDragged = true;
-                }
-                
-                if (editModalZoomed && hasDragged) {
-                    // Update pan position
-                    editModalImageTransform.x = dragStartPosX + (e.clientX - dragStartX);
-                    editModalImageTransform.y = dragStartPosY + (e.clientY - dragStartY);
-                    updateEditModalImageTransform();
-                }
-            });
-            
-            editModalImageContainer.addEventListener('mouseup', function(e) {
-                if (!isDragging) return;
-                
-                // If it was a drag, don't toggle zoom
-                if (hasDragged) {
-                    isDragging = false;
-                    hasDragged = false;
-                    return;
-                }
-                
-                // If it was just a click (no drag), toggle zoom
-                if (!editModalZoomed) {
-                    // Don't zoom if clicking on controls or navigation
-                    if (e.target.closest('.edit-modal-image-nav') || 
-                        e.target.closest('.edit-modal-image-controls') ||
-                        e.target.closest('.edit-modal-rotate-btn')) {
-                        isDragging = false;
-                        hasDragged = false;
-                        return;
-                    }
-                    toggleEditModalZoom();
-                } else {
-                    // If already zoomed and it's a click (not drag), zoom out
-                    toggleEditModalZoom();
-                }
-                
-                isDragging = false;
-                hasDragged = false;
-            });
-        }
+        // Zoom/pan functionality is now handled by ImageModal
+        // The old handlers are removed - ImageModal handles this
         
         // Navigation arrows
         if (editModalNavLeft) {
@@ -2726,35 +2619,8 @@
             });
         }
         
-        // Rotation buttons
-        if (editModalRotateCW) {
-            editModalRotateCW.addEventListener('click', async function(e) {
-                e.stopPropagation();
-                editModalCurrentRotation = (editModalCurrentRotation + 90) % 360;
-                updateEditModalImageTransform();
-                updateEditModalRotationDisplay();
-                await saveEditModalRotation();
-            });
-        }
-        
-        if (editModalRotateCCW) {
-            editModalRotateCCW.addEventListener('click', async function(e) {
-                e.stopPropagation();
-                editModalCurrentRotation = (editModalCurrentRotation - 90 + 360) % 360;
-                updateEditModalImageTransform();
-                updateEditModalRotationDisplay();
-                await saveEditModalRotation();
-            });
-        }
-
-        // Edit modal unneeded checkbox handler
-        const editModalUnneededCheckbox = document.getElementById('editModalUnneededCheckbox');
-        if (editModalUnneededCheckbox) {
-            editModalUnneededCheckbox.addEventListener('change', function(e) {
-                e.stopPropagation();
-                updateEditModalUnneededStatus(this.checked);
-            });
-        }
+        // Rotation and unneeded checkbox are now handled by ImageModal
+        // The old handlers are removed - ImageModal handles this
         
         async function saveEditModalRotation() {
             if (!editModalRecipeId || editModalImages.length === 0) return;
