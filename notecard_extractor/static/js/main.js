@@ -2176,6 +2176,14 @@
         });
         
         // Edit Modal Functions
+        // Edit modal state variables
+        let editModalRecipeId = null;
+        let editModalImages = [];
+        let editModalCurrentIndex = 0;
+        let editModalCurrentRotation = 0;
+        let editModalZoomed = false;
+        let editModalImageTransform = { x: 0, y: 0, scale: 1 };
+        
         async function openEditModal(recipeId) {
             const modal = document.getElementById('editModal');
             const form = document.getElementById('editRecipeForm');
@@ -2190,6 +2198,7 @@
             editModalRecipeId = recipeId;
             editModalImages = [];
             editModalCurrentIndex = 0;
+            editModalCurrentRotation = 0;
             if (editModalImageModal) {
                 editModalImageModal.reset();
             } else {
