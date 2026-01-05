@@ -115,7 +115,7 @@ class ImageModal {
                 this.container.removeEventListener('change', this._containerCheckboxHandler, true);
             }
             
-            // Create a single handler for all checkbox-related events
+            // Create a handler for wrapper/label clicks only (checkbox clicks are handled directly)
             // Query elements dynamically inside the handler to avoid stale closures
             this._containerCheckboxHandler = (e) => {
                 const target = e.target;
@@ -131,21 +131,26 @@ class ImageModal {
                 const currentWrapper = checkbox.closest('.unneeded-checkbox-wrapper') || 
                                      checkbox.closest('.edit-modal-unneeded-checkbox-wrapper');
                 
+                // Only handle wrapper or label clicks, not direct checkbox clicks
                 const isCheckbox = target === checkbox || target.id === this.config.checkboxId;
                 const isLabel = currentLabel && (target === currentLabel || target.matches(this.config.checkboxLabelSelector));
                 const isWrapper = currentWrapper && (target === currentWrapper || target.closest('.unneeded-checkbox-wrapper') === currentWrapper || target.closest('.edit-modal-unneeded-checkbox-wrapper') === currentWrapper);
                 
-                if (isCheckbox || isLabel || isWrapper) {
+                // Skip if clicking directly on checkbox (handled by direct handlers)
+                if (isCheckbox) return;
+                
+                // Only handle wrapper or label clicks
+                if (isLabel || isWrapper) {
                     console.log('ImageModal: Container event delegation handler fired', { isCheckbox, isLabel, isWrapper, target: target.tagName, targetId: target.id });
                     handleCheckboxInteraction(e);
                     
-                    // If clicking on wrapper or label, toggle checkbox
+                    // Toggle checkbox when clicking wrapper or label
                     if ((isWrapper && target === currentWrapper) || (isLabel && target === currentLabel)) {
                         checkbox.checked = !checkbox.checked;
+                        // Trigger change event manually
+                        const changeEvent = new Event('change', { bubbles: true, cancelable: true });
+                        checkbox.dispatchEvent(changeEvent);
                     }
-                    
-                    // Always call the change handler
-                    handleCheckboxChange(e);
                 }
             };
             
@@ -155,13 +160,16 @@ class ImageModal {
         }
         
         // Also attach directly to checkbox for immediate response
+        // Note: We use stopImmediatePropagation to prevent container delegation from also handling
         checkbox.addEventListener('mousedown', handleCheckboxInteraction, true);
         checkbox.addEventListener('click', (e) => {
-            console.log('ImageModal: Direct checkbox click handler fired');
-            handleCheckboxChange(e);
+            // Only prevent propagation, don't call handleCheckboxChange here
+            // The change event will fire automatically and handle the state change
+            e.stopImmediatePropagation();
         }, true);
         checkbox.addEventListener('change', (e) => {
             console.log('ImageModal: Direct checkbox change handler fired');
+            e.stopImmediatePropagation(); // Prevent container handler from also firing
             handleCheckboxChange(e);
         }, true);
 
